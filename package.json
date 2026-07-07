@@ -1,0 +1,25 @@
+{
+  "name": "createwithskai-platform",
+  "private": true,
+  "version": "1.0.0",
+  "description": "AI Influencer Launchpad by Skai Monroe — unified SaaS monorepo (hub, coach, hq, builder)",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:hub": "npm run dev -w apps/hub",
+    "dev:coach": "npm run dev -w apps/coach",
+    "dev:hq": "npm run dev -w apps/hq",
+    "dev:builder": "npm run dev -w apps/builder",
+    "build:hub": "npm run build -w apps/hub",
+    "build:coach": "npm run build -w apps/coach",
+    "build:hq": "npm run build -w apps/hq",
+    "build:builder": "npm run build -w apps/builder",
+    "build": "npm run build --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
