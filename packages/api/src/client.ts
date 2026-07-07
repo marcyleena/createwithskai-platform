@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
-import { createBrowserClient } from "@supabase/ssr";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { ROOT_DOMAIN, isOnRootDomain } from "./domain";
+import { createCookieStorage } from "./cookieStorage";
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
@@ -25,17 +25,21 @@ function isSecureContext(): boolean {
   return typeof window !== "undefined" && window.location.protocol === "https:";
 }
 
+// Same literal key in every app so all four read/write the same cookie.
+const STORAGE_KEY = "sb-createwithskai-auth";
+
 // Untyped on purpose: see @createwithskai/types for the row shapes to cast
 // query results against at the call site (`data as SomeRowType`).
-export const supabase: SupabaseClient = createBrowserClient(supabaseUrl, supabaseAnonKey, {
-  cookieOptions: {
-    // Same literal name in every app so a stray localStorage-based client
-    // (or an older cookie) never gets read as if it were current.
-    name: "sb-createwithskai-auth",
-    domain: cookieDomain(),
-    path: "/",
-    sameSite: "lax",
-    secure: isSecureContext(),
-    maxAge: 60 * 60 * 24 * 365, // 1 year; the refresh token rotates well before this
+export const supabase: SupabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    storageKey: STORAGE_KEY,
+    storage: createCookieStorage({
+      domain: cookieDomain(),
+      secure: isSecureContext(),
+      maxAgeSeconds: 60 * 60 * 24 * 365, // 1 year; the refresh token rotates well before this
+    }),
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
   },
 });
