@@ -1,33 +1,64 @@
-import { useState, type FormEvent } from "react";
-import { Navigate, useNavigate } from "react-router-dom";
+import { useEffect, useState, type FormEvent } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@createwithskai/auth";
+import { ROOT_DOMAIN } from "@createwithskai/api";
 import { Button, Card, Input } from "@createwithskai/ui";
+
+// Only ever redirect back into our own domain (or localhost in dev) — never
+// follow an arbitrary `next` value, since that would be an open redirect.
+function resolveNext(raw: string | null): string | null {
+  if (!raw) return null;
+  try {
+    const url = new URL(raw, window.location.origin);
+    const isTrusted =
+      url.hostname === ROOT_DOMAIN ||
+      url.hostname.endsWith(`.${ROOT_DOMAIN}`) ||
+      url.hostname === "localhost";
+    return isTrusted ? url.href : null;
+  } catch {
+    return null;
+  }
+}
 
 export function LoginPage() {
   const { user, loading: authLoading, signIn, signUp } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const next = resolveNext(searchParams.get("next"));
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [mode, setMode] = useState<"sign-in" | "sign-up">("sign-in");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  if (!authLoading && user) return <Navigate to="/" replace />;
+  // Already signed in (e.g. arrived here from a stale link, or the shared
+  // session was already set by another app) — bounce straight through.
+  useEffect(() => {
+    if (!authLoading && user) {
+      if (next) window.location.href = next;
+      else navigate("/", { replace: true });
+    }
+  }, [authLoading, user, next, navigate]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError(null);
 
-    const { error: authError } = mode === "sign-in" ? await signIn(email, password) : await signUp(email, password);
+    const { error: authError } =
+      mode === "sign-in" ? await signIn(email, password) : await signUp(email, password);
 
     setLoading(false);
     if (authError) {
       setError(authError);
       return;
     }
-    navigate("/");
+    if (next) window.location.href = next;
+    else navigate("/");
   }
+
+  if (!authLoading && user) return null;
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-cream px-6">
