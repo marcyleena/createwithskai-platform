@@ -23,7 +23,7 @@ const TOOLS = [
     icon: <BuilderIcon className="h-6 w-6" />,
     title: "App Builder",
     description:
-      "Turn what you've built into something people can buy — a digital product or a small app — without learning to code first.",
+      "Turn what you've built into something people can buy -- a digital product or a small app -- without learning to code first.",
   },
 ];
 
@@ -47,9 +47,8 @@ export function MarketingPage() {
               Build an influencer brand without guessing your way through it.
             </h1>
             <p className="mx-auto mb-9 max-w-xl text-base leading-relaxed text-espresso/70 sm:text-lg">
-              Skai Monroe put the process she actually uses — for strategy, competitive research,
-              and shipping real products — into three tools that share one account. Make a
-              decision once, use it everywhere.
+              One account. Three tools. Everything your brand needs to go from idea to income --
+              without starting over every time you switch tools.
             </p>
             <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
               <a href={STAN_STORE_URL} target="_blank" rel="noreferrer">

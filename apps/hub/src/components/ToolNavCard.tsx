@@ -18,7 +18,7 @@ export function ToolNavCard({ icon, title, description, cta }: ToolNavCardProps)
       <p className="mb-5 flex-1 text-sm leading-relaxed text-espresso/70">{description}</p>
       {cta && (
         <a href={cta.href} className="self-start">
-          <Button variant="secondary">{cta.label}</Button>
+          <Button variant="dark">{cta.label}</Button>
         </a>
       )}
     </Card>

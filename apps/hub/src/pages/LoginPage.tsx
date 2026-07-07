@@ -4,7 +4,7 @@ import { useAuth } from "@createwithskai/auth";
 import { ROOT_DOMAIN } from "@createwithskai/api";
 import { Button, Card, Input } from "@createwithskai/ui";
 
-// Only ever redirect back into our own domain (or localhost in dev) — never
+// Only ever redirect back into our own domain (or localhost in dev) -- never
 // follow an arbitrary `next` value, since that would be an open redirect.
 function resolveNext(raw: string | null): string | null {
   if (!raw) return null;
@@ -33,7 +33,7 @@ export function LoginPage() {
   const [loading, setLoading] = useState(false);
 
   // Already signed in (e.g. arrived here from a stale link, or the shared
-  // session was already set by another app) — bounce straight through.
+  // session was already set by another app) -- bounce straight through.
   useEffect(() => {
     if (!authLoading && user) {
       if (next) window.location.href = next;
