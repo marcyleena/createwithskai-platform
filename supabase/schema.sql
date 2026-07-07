@@ -71,6 +71,10 @@ create table if not exists public.user_credentials (
 
 create index if not exists user_credentials_user_id_idx on public.user_credentials (user_id);
 
+-- One row per (user, provider, credential type) — lets the dashboard upsert API keys.
+create unique index if not exists user_credentials_user_provider_type_idx
+  on public.user_credentials (user_id, provider, credential_type);
+
 drop trigger if exists set_updated_at on public.user_credentials;
 create trigger set_updated_at
   before update on public.user_credentials
