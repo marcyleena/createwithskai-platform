@@ -9,14 +9,15 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.110.0",
+    "@babel/standalone": "^7.25.6",
     "@createwithskai/api": "*",
     "@createwithskai/auth": "*",
     "@createwithskai/types": "*",
     "@createwithskai/ui": "*",
     "@supabase/supabase-js": "^2.45.4",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "react-router-dom": "^6.26.0"
+    "react-dom": "^18.3.1"
   },
   "devDependencies": {
     "@types/react": "^18.3.3",

@@ -46,3 +46,16 @@ record for the apex domain on `hub`).
 
 Before going live, run `supabase/schema.sql` against the shared project — see
 [`supabase/README.md`](supabase/README.md).
+
+## 5. App Builder's GitHub OAuth App (builder project only)
+
+The App Builder's "Connect GitHub" step needs a GitHub OAuth App:
+
+1. Create one at github.com/settings/developers → "New OAuth App".
+2. Homepage URL: `https://build.createwithskai.cloud`.
+3. Authorization callback URL: `https://build.createwithskai.cloud/api/github/callback`.
+4. Add to the `builder` Vercel project only:
+   - `VITE_GITHUB_CLIENT_ID` — the OAuth App's Client ID (client-visible, safe to expose)
+   - `GITHUB_CLIENT_SECRET` — the OAuth App's Client Secret (server-only; used by
+     `api/github/callback.js` to exchange the code for a token — never add a `VITE_` prefix
+     to this one)
