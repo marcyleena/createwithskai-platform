@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@createwithskai/ui";
 import { STYLE_TILES, findStyleTile } from "../lib/styleTiles";
 import { deriveBuildName } from "../lib/naming";
+import { loadIntakeDraft, saveIntakeDraft, clearIntakeDraft } from "../lib/intakeDraft";
 import { EMPTY_ANSWERS, type IntakeAnswers, type StyleTileId } from "../lib/types";
 
 interface IntakeWizardProps {
@@ -39,6 +40,18 @@ interface HistoryEntry {
   text: string;
 }
 
+interface IntakeDraft {
+  step: Step;
+  editingSection: Section | null;
+  answers: IntakeAnswers;
+  history: HistoryEntry[];
+  basicsInput: string;
+}
+
+function getDraft(): IntakeDraft | null {
+  return loadIntakeDraft<IntakeDraft>();
+}
+
 function ChatBubble({ role, children }: { role: "assistant" | "user"; children: React.ReactNode }) {
   return (
     <div className={`flex ${role === "user" ? "justify-end" : "justify-start"}`}>
@@ -54,11 +67,19 @@ function ChatBubble({ role, children }: { role: "assistant" | "user"; children: 
 }
 
 export function IntakeWizard({ onComplete }: IntakeWizardProps) {
-  const [answers, setAnswers] = useState<IntakeAnswers>(EMPTY_ANSWERS);
-  const [step, setStep] = useState<Step>("appName");
-  const [history, setHistory] = useState<HistoryEntry[]>([{ role: "assistant", text: BASICS_FIELDS[0].prompt }]);
-  const [basicsInput, setBasicsInput] = useState("");
-  const [editingSection, setEditingSection] = useState<Section | null>(null);
+  const [answers, setAnswers] = useState<IntakeAnswers>(() => getDraft()?.answers ?? EMPTY_ANSWERS);
+  const [step, setStep] = useState<Step>(() => getDraft()?.step ?? "appName");
+  const [history, setHistory] = useState<HistoryEntry[]>(
+    () => getDraft()?.history ?? [{ role: "assistant", text: BASICS_FIELDS[0].prompt }]
+  );
+  const [basicsInput, setBasicsInput] = useState(() => getDraft()?.basicsInput ?? "");
+  const [editingSection, setEditingSection] = useState<Section | null>(() => getDraft()?.editingSection ?? null);
+
+  // Persist every change so switching tabs, refreshing, or coming back later
+  // never loses in-progress answers -- cleared on Generate App / New Build.
+  useEffect(() => {
+    saveIntakeDraft({ step, editingSection, answers, history, basicsInput } satisfies IntakeDraft);
+  }, [step, editingSection, answers, history, basicsInput]);
 
   function patch(update: Partial<IntakeAnswers>) {
     setAnswers((prev) => ({ ...prev, ...update }));
@@ -340,7 +361,10 @@ export function IntakeWizard({ onComplete }: IntakeWizardProps) {
 
         <Button
           variant="dark"
-          onClick={() => onComplete(answers)}
+          onClick={() => {
+            clearIntakeDraft();
+            onComplete(answers);
+          }}
           className="!bg-espresso !text-white justify-center py-3 text-base"
         >
           Generate App

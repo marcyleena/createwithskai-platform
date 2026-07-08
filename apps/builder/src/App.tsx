@@ -15,6 +15,7 @@ import { generateApp, requestChange, friendlyErrorMessage } from "./lib/anthropi
 import { determineStack, STACK_LABELS } from "./lib/stackDetection";
 import { deployApp, type DeployResult } from "./lib/deployClient";
 import { consumeGithubOAuthResult } from "./lib/githubOAuth";
+import { clearIntakeDraft } from "./lib/intakeDraft";
 import { resolveAppName, slugifyRepoName } from "./lib/naming";
 import type { BuildConfig, GeneratedFile, IntakeAnswers, Stack } from "./lib/types";
 
@@ -46,6 +47,7 @@ function BuilderApp() {
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [mode, setMode] = useState<Mode>("intake");
+  const [intakeKey, setIntakeKey] = useState(0);
   const [activeBuildId, setActiveBuildId] = useState<string | null>(null);
   const [buildName, setBuildName] = useState("");
   const [stack, setStack] = useState<Stack>("static-html");
@@ -162,6 +164,8 @@ function BuilderApp() {
   }
 
   function handleNewBuild() {
+    clearIntakeDraft();
+    setIntakeKey((k) => k + 1);
     setActiveBuildId(null);
     setBuildName("");
     setFiles([]);
@@ -222,7 +226,7 @@ function BuilderApp() {
                   {generateError}
                 </p>
               )}
-              <IntakeWizard onComplete={handleIntakeComplete} />
+              <IntakeWizard key={intakeKey} onComplete={handleIntakeComplete} />
             </div>
           )}
 
