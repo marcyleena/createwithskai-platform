@@ -33,7 +33,7 @@ function CoachApp() {
   const { apiKey, loading: apiKeyLoading } = useApiKey();
   const { conversations, createConversation, saveMessages, renameConversation, deleteConversation } =
     useConversations(user?.id);
-  const { profile: brandProfile, refresh: refreshBrandProfile } = useBrandProfile(user?.id);
+  const { profile: brandProfile } = useBrandProfile(user?.id);
 
   const [mode, setMode] = useState<"chat" | "builder">("chat");
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
@@ -108,7 +108,6 @@ function CoachApp() {
               apiKey={apiKey}
               conversation={activeConversation}
               brandProfile={brandProfile}
-              onBrandProfileChanged={refreshBrandProfile}
               onCreateConversation={createConversation}
               onConversationPersisted={handleConversationPersisted}
               onSaveMessages={saveMessages}

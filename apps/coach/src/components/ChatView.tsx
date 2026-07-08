@@ -6,15 +6,15 @@ import { QuickPrompts } from "./QuickPrompts";
 import { ChatInput } from "./ChatInput";
 import { streamChatResponse, friendlyErrorMessage } from "../lib/anthropic";
 import { buildSystemPrompt } from "../lib/systemPrompt";
-import { extractAndSaveBrandInfo } from "../lib/brandExtraction";
+import { extractProfileFromConversation } from "../lib/profileExtraction";
 import { readFileAsAttachment, type PendingAttachment } from "../lib/fileReading";
+import { useUserProfile } from "../hooks/useUserProfile";
 import type { ChatMessage } from "../hooks/useConversations";
 
 interface ChatViewProps {
   apiKey: string;
   conversation: CoachConversation | null;
   brandProfile: BrandProfile | null;
-  onBrandProfileChanged: () => void;
   onCreateConversation: () => Promise<CoachConversation | null>;
   onConversationPersisted: (conv: CoachConversation) => void;
   onSaveMessages: (id: string, messages: ChatMessage[], title?: string) => void;
@@ -29,12 +29,12 @@ export function ChatView({
   apiKey,
   conversation,
   brandProfile,
-  onBrandProfileChanged,
   onCreateConversation,
   onConversationPersisted,
   onSaveMessages,
 }: ChatViewProps) {
   const { user } = useAuth();
+  const { profile: userProfile, mergeProfile } = useUserProfile(user?.id);
   const [messages, setMessages] = useState<ChatMessage[]>(conversation?.messages ?? []);
   const [conversationId, setConversationId] = useState<string | null>(conversation?.id ?? null);
   const [input, setInput] = useState("");
@@ -89,7 +89,7 @@ export function ChatView({
     try {
       const assistantText = await streamChatResponse({
         apiKey,
-        system: buildSystemPrompt(brandProfile),
+        system: buildSystemPrompt(brandProfile, userProfile),
         history: historyBeforeThisTurn,
         userText: text,
         attachments: currentAttachments,
@@ -113,15 +113,8 @@ export function ChatView({
         onSaveMessages(id, finalMessages, isFirstMessage ? deriveTitle(text) : undefined);
       }
 
-      extractAndSaveBrandInfo({
-        apiKey,
-        userId: user.id,
-        userText: text,
-        assistantText,
-        currentProfile: brandProfile,
-      }).then((updated) => {
-        if (updated) onBrandProfileChanged();
-      });
+      const extracted = extractProfileFromConversation(finalMessages);
+      if (extracted) mergeProfile(extracted);
     } catch (err) {
       setStreamingText(null);
       setMessages([...nextMessages, { role: "assistant", content: friendlyErrorMessage(err) }]);
