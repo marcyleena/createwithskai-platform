@@ -5,3 +5,40 @@
 body {
   @apply bg-cream text-espresso;
 }
+
+.markdown-content > * + * {
+  margin-top: 0.75em;
+}
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3 {
+  @apply font-semibold text-espresso;
+}
+.markdown-content h1 {
+  font-size: 1.15em;
+}
+.markdown-content h2 {
+  font-size: 1.08em;
+}
+.markdown-content ul,
+.markdown-content ol {
+  padding-left: 1.25em;
+}
+.markdown-content ul {
+  list-style: disc;
+}
+.markdown-content ol {
+  list-style: decimal;
+}
+.markdown-content a {
+  @apply text-accent-pink underline;
+}
+.markdown-content code {
+  @apply rounded bg-taupe/20 px-1 py-0.5 text-[0.9em];
+}
+.markdown-content pre {
+  @apply overflow-x-auto rounded-lg bg-espresso p-3 text-cream;
+}
+.markdown-content pre code {
+  @apply bg-transparent p-0;
+}
