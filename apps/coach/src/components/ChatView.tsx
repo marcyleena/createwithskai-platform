@@ -3,6 +3,7 @@ import { useAuth } from "@createwithskai/auth";
 import type { BrandProfile, CoachConversation } from "@createwithskai/types";
 import { MessageBubble } from "./MessageBubble";
 import { QuickPrompts } from "./QuickPrompts";
+import { SuggestionsPanel } from "./SuggestionsPanel";
 import { ChatInput } from "./ChatInput";
 import { streamChatResponse, friendlyErrorMessage } from "../lib/anthropic";
 import { buildSystemPrompt } from "../lib/systemPrompt";
@@ -172,6 +173,9 @@ export function ChatView({
           attachments={attachments}
           onAddFiles={handleAddFiles}
           onRemoveAttachment={handleRemoveAttachment}
+          topSlot={
+            messages.length > 0 ? <SuggestionsPanel onSelect={sendMessage} disabled={sending} /> : undefined
+          }
         />
       </div>
     </div>

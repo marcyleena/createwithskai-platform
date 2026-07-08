@@ -1,4 +1,4 @@
-import { useCallback, useRef } from "react";
+import { useCallback, useRef, type ReactNode } from "react";
 import { Button } from "@createwithskai/ui";
 import { useSpeechRecognition } from "../hooks/useSpeechRecognition";
 import type { PendingAttachment } from "../lib/fileReading";
@@ -11,6 +11,8 @@ interface ChatInputProps {
   attachments: PendingAttachment[];
   onAddFiles: (files: FileList) => void;
   onRemoveAttachment: (id: string) => void;
+  /** Rendered above the input row, inside the same footer chrome (e.g. the suggestions toggle). */
+  topSlot?: ReactNode;
 }
 
 export function ChatInput({
@@ -21,6 +23,7 @@ export function ChatInput({
   attachments,
   onAddFiles,
   onRemoveAttachment,
+  topSlot,
 }: ChatInputProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const baseValueRef = useRef("");
@@ -47,6 +50,7 @@ export function ChatInput({
 
   return (
     <form onSubmit={handleSubmit} className="border-t border-taupe/30 bg-cream p-3 sm:p-4">
+      {topSlot && <div className="mb-2">{topSlot}</div>}
       {attachments.length > 0 && (
         <div className="mb-2 flex flex-wrap gap-2">
           {attachments.map((a) => (
