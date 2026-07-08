@@ -44,8 +44,8 @@ export function useSpeechRecognition(onTranscript: (text: string) => void) {
     if (!Ctor) return;
 
     const recognition = new Ctor();
-    recognition.continuous = false;
-    recognition.interimResults = false;
+    recognition.continuous = true;
+    recognition.interimResults = true;
     recognition.lang = "en-US";
 
     recognition.onresult = (event) => {

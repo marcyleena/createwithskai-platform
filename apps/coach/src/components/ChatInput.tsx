@@ -23,14 +23,21 @@ export function ChatInput({
   onRemoveAttachment,
 }: ChatInputProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const baseValueRef = useRef("");
 
-  const appendTranscript = useCallback(
+  const handleTranscript = useCallback(
     (text: string) => {
-      onChange(value ? `${value} ${text}` : text);
+      const base = baseValueRef.current;
+      onChange(base ? `${base} ${text}` : text);
     },
-    [value, onChange]
+    [onChange]
   );
-  const { supported: voiceSupported, listening, toggle: toggleVoice } = useSpeechRecognition(appendTranscript);
+  const { supported: voiceSupported, listening, toggle } = useSpeechRecognition(handleTranscript);
+
+  const toggleVoice = useCallback(() => {
+    if (!listening) baseValueRef.current = value;
+    toggle();
+  }, [listening, toggle, value]);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -114,7 +121,7 @@ export function ChatInput({
           type="submit"
           variant="primary"
           disabled={disabled || (!value.trim() && attachments.length === 0)}
-          className="px-5 py-2.5"
+          className="!bg-accent-pink px-5 py-2.5 !text-white hover:!bg-accent-pink/90"
         >
           Send
         </Button>
