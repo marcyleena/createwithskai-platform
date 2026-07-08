@@ -51,8 +51,19 @@ ${REACT_FILE_RULES}
 ${JSON_CONTRACT}`;
 }
 
+const QUALITY_BAR = `Build this to production-ready quality -- something the user could hand directly to real customers and charge money for today. That means:
+- Clean, well-architected code: sensible component/state structure, clear naming, no dead code.
+- Proper error handling: never let an operation fail silently; surface a clear message when something goes wrong (a failed fetch, invalid input, a rejected auth call).
+- Input validation: validate anything the user types or submits before acting on it, and give specific feedback when it's invalid.
+- Loading states: show a clear loading/pending indicator for anything asynchronous (initial load, submits, auth).
+- Empty states: every list, table, or feed needs a designed empty state for when there's no data yet, not a blank screen.
+- Accessible markup: semantic HTML elements, labels tied to inputs, sufficient color contrast, visible focus states, and keyboard operability.
+- Performance: avoid unnecessary re-renders, don't do expensive work on every keystroke/render, keep the bundle lean.`;
+
 export function buildGenerationPrompt(stack: Stack, answers: IntakeAnswers): string {
-  return `You are generating a working prototype web app from a short intake conversation. Write clean, well-commented, working code -- functional and well-structured, but not over-engineered. This is a first working version, not a production system: skip elaborate error handling, testing, or configuration that isn't needed for the app to work.
+  return `You are generating a web app from a short intake conversation.
+
+${QUALITY_BAR}
 
 What the app does: ${answers.summary}
 Who it's for: ${answers.audience}
@@ -69,7 +80,9 @@ ${currentFiles}
 
 The user's change request: "${request}"
 
-Apply the requested change while keeping everything else working. Write clean, well-commented, working code -- functional and well-structured, but not over-engineered.
+Apply the requested change while keeping everything else working.
+
+${QUALITY_BAR}
 
 ${stackInstructions(stack)}
 
