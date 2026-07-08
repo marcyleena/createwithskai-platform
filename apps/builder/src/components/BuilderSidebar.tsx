@@ -33,12 +33,12 @@ export function BuilderSidebar({
     <>
       {isOpen && <div className="fixed inset-0 z-30 bg-espresso/40 sm:hidden" onClick={onClose} />}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 flex w-72 flex-none flex-col border-r border-taupe/30 bg-white transition-transform sm:static sm:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-40 flex w-72 flex-none flex-col border-r border-taupe/30 bg-cream transition-transform sm:static sm:translate-x-0 ${
           isOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
         <div className="border-b border-taupe/30 p-4">
-          <Button variant="dark" onClick={onNew} className="w-full justify-center">
+          <Button variant="dark" onClick={onNew} className="!bg-espresso !text-white w-full justify-center">
             New build
           </Button>
         </div>
@@ -53,7 +53,7 @@ export function BuilderSidebar({
               <div
                 key={build.id}
                 className={`group mb-1 rounded-lg px-3 py-2 text-sm ${
-                  build.id === activeId ? "bg-accent-pink/15" : "hover:bg-cream"
+                  build.id === activeId ? "bg-accent-pink/15" : "hover:bg-white"
                 }`}
               >
                 <button type="button" onClick={() => onSelect(build.id)} className="block w-full text-left">

@@ -1,12 +1,6 @@
 import type { IntakeAnswers, Stack } from "./types";
-
-// Exactly four questions, asked in order, before we generate anything.
-export const INTAKE_QUESTIONS: Array<{ key: keyof IntakeAnswers; prompt: string }> = [
-  { key: "summary", prompt: "What does the app do? Describe it in one sentence." },
-  { key: "audience", prompt: "Who is it for?" },
-  { key: "needsAccounts", prompt: "Does it need user accounts, so people can log in?" },
-  { key: "needsPersistence", prompt: "Does it need to save data between sessions -- so it's still there after closing and reopening?" },
-];
+import { findStyleTile } from "./styleTiles";
+import { resolveAppName } from "./naming";
 
 // Files are transported as plain delimited text, not JSON. Real source code
 // is full of quotes, backslashes, and template literals that are easy for a
@@ -70,15 +64,56 @@ const QUALITY_BAR = `Build this to production-ready quality -- something the use
 - Performance: avoid unnecessary re-renders, don't do expensive work on every keystroke/render, keep the bundle lean.
 - Scope: generate the minimum viable complete app. Every core feature described below must actually work end to end, with no placeholder or "coming soon" sections -- but nothing beyond what was described. Keep this initial version focused and concise: a single well-structured file for static apps, or a minimal but complete set of files for React apps. The user can ask for additions afterward through the change-request flow.`;
 
+function visualDirectionText(answers: IntakeAnswers): string {
+  const tile = findStyleTile(answers.styleTile);
+  const parts: string[] = [];
+  if (tile) parts.push(`${tile.label} -- ${tile.description}`);
+  if (answers.customVibe.trim()) parts.push(`Additional direction from the user: ${answers.customVibe.trim()}`);
+  if (parts.length === 0) {
+    return "No specific direction was given -- use your best judgment for a polished, cohesive, distinctive look (avoid a generic default Bootstrap-like appearance).";
+  }
+  return parts.join(" ");
+}
+
+function colorPaletteText(answers: IntakeAnswers): string {
+  if (answers.colorInput.trim()) {
+    return `Use this color palette throughout: ${answers.colorInput.trim()}`;
+  }
+  return "No specific colors were given -- invent a cohesive color palette that matches the visual direction above, and apply it consistently across every screen and component.";
+}
+
+function aiFeatureText(answers: IntakeAnswers): string {
+  if (!answers.usesAI) return "";
+  const description = answers.aiDescription.trim() || "(not described further by the user)";
+  return `
+This app needs a real, working AI feature: ${description}
+Implement it for real, not a mock -- call the Anthropic Messages API (model "claude-sonnet-4-6") directly from the client with fetch. Ask the user for their own Anthropic API key once in a simple settings area, store it in localStorage, and use it for every AI call. Handle the loading and error states for these calls the same as any other async operation in the app.`;
+}
+
 export function buildGenerationPrompt(stack: Stack, answers: IntakeAnswers): string {
-  return `You are generating a web app from a short intake conversation.
+  const appName = resolveAppName(answers);
+  const featureList = answers.features.trim() || "(none listed -- infer the minimal set of features the description above requires)";
+
+  return `You are generating a web app from a detailed intake.
 
 ${QUALITY_BAR}
 
-What the app does: ${answers.summary}
+App name: ${appName}
+What it does: ${answers.description}
 Who it's for: ${answers.audience}
-Needs user accounts: ${answers.needsAccounts}
-Needs to save data between sessions: ${answers.needsPersistence}
+
+Visual direction: ${visualDirectionText(answers)}
+Color palette: ${colorPaletteText(answers)}
+Apply this visual direction and color palette throughout the app -- typography, spacing, and every component's styling should consistently reflect it. Do not fall back to a generic look.
+
+Core features (implement every one of these completely and end to end -- no placeholders):
+${featureList}
+
+Needs user accounts: ${answers.needsAccounts ? "Yes" : "No"}
+Needs to save data between sessions: ${answers.needsPersistence ? "Yes" : "No"}
+Uses AI: ${answers.usesAI ? "Yes" : "No"}
+${aiFeatureText(answers)}
+${answers.specialRequirements.trim() ? `Special requirements: ${answers.specialRequirements.trim()}` : ""}
 
 ${stackInstructions(stack)}`;
 }

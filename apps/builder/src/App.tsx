@@ -4,7 +4,7 @@ import { getHubOrigin } from "@createwithskai/api";
 import { Button, Card } from "@createwithskai/ui";
 import type { AppBuild } from "@createwithskai/types";
 import { BuilderSidebar } from "./components/BuilderSidebar";
-import { IntakeChat } from "./components/IntakeChat";
+import { IntakeWizard } from "./components/IntakeWizard";
 import { LivePreview } from "./components/LivePreview";
 import { ChangeRequestBar } from "./components/ChangeRequestBar";
 import { DeploySection } from "./components/DeploySection";
@@ -15,7 +15,7 @@ import { generateApp, requestChange, friendlyErrorMessage } from "./lib/anthropi
 import { determineStack, STACK_LABELS } from "./lib/stackDetection";
 import { deployApp, type DeployResult } from "./lib/deployClient";
 import { consumeGithubOAuthResult } from "./lib/githubOAuth";
-import { deriveBuildName, slugifyRepoName } from "./lib/naming";
+import { resolveAppName, slugifyRepoName } from "./lib/naming";
 import type { BuildConfig, GeneratedFile, IntakeAnswers, Stack } from "./lib/types";
 
 type Mode = "intake" | "generating" | "build";
@@ -86,7 +86,7 @@ function BuilderApp() {
 
     try {
       const generatedFiles = await generateApp(apiKey!, detectedStack, newAnswers, setGenerateProgress);
-      const name = deriveBuildName(newAnswers.summary);
+      const name = resolveAppName(newAnswers);
       setBuildName(name);
       setFiles(generatedFiles);
       setDeployResult(null);
@@ -222,7 +222,7 @@ function BuilderApp() {
                   {generateError}
                 </p>
               )}
-              <IntakeChat onComplete={handleIntakeComplete} />
+              <IntakeWizard onComplete={handleIntakeComplete} />
             </div>
           )}
 
