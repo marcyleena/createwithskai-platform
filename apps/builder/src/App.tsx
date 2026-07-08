@@ -53,6 +53,7 @@ function BuilderApp() {
   const [answers, setAnswers] = useState<IntakeAnswers | null>(null);
 
   const [generateError, setGenerateError] = useState<string | null>(null);
+  const [generateProgress, setGenerateProgress] = useState(0);
   const [changeRequesting, setChangeRequesting] = useState(false);
   const [changeError, setChangeError] = useState<string | null>(null);
   const [deploying, setDeploying] = useState(false);
@@ -81,9 +82,10 @@ function BuilderApp() {
     setStack(detectedStack);
     setMode("generating");
     setGenerateError(null);
+    setGenerateProgress(0);
 
     try {
-      const generatedFiles = await generateApp(apiKey!, detectedStack, newAnswers);
+      const generatedFiles = await generateApp(apiKey!, detectedStack, newAnswers, setGenerateProgress);
       const name = deriveBuildName(newAnswers.summary);
       setBuildName(name);
       setFiles(generatedFiles);
@@ -230,6 +232,9 @@ function BuilderApp() {
               <p className="text-sm text-espresso/70">
                 Building your {STACK_LABELS[stack].toLowerCase()} app...
               </p>
+              {generateProgress > 0 && (
+                <p className="text-xs text-espresso/40">{generateProgress.toLocaleString()} characters generated</p>
+              )}
             </div>
           )}
 

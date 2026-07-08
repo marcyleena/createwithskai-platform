@@ -8,8 +8,17 @@ export const INTAKE_QUESTIONS: Array<{ key: keyof IntakeAnswers; prompt: string 
   { key: "needsPersistence", prompt: "Does it need to save data between sessions -- so it's still there after closing and reopening?" },
 ];
 
-const JSON_CONTRACT = `Respond with ONLY a JSON object in exactly this shape, no markdown code fences, no commentary before or after it:
-{"files":[{"path":"...","content":"..."}]}`;
+// Files are transported as plain delimited text, not JSON. Real source code
+// is full of quotes, backslashes, and template literals that are easy for a
+// model to mis-escape inside a JSON string -- one bad escape breaks the
+// entire response. Plain markers avoid escaping entirely and let us recover
+// whatever files finished even if a response gets cut off.
+const FILE_FORMAT = `Output every file wrapped in these exact markers, with no JSON, no markdown code fences, and no commentary before, between, or after them:
+~~~FILE:path/to/file~~~
+(the complete raw file content, written exactly as it should appear in the file -- no escaping, no quoting)
+~~~ENDFILE~~~
+
+Repeat that block for every file, one after another.`;
 
 const REACT_FILE_RULES = `Rules for src/App.jsx specifically, because it also has to run standalone in a live preview:
 - Export the component as a named function: function App() { ... } and put "export default App;" alone on the last line.
@@ -21,7 +30,7 @@ function stackInstructions(stack: Stack): string {
   if (stack === "static-html") {
     return `Generate a single, complete HTML file with embedded <style> and <script> tags. No external dependencies, no build step, no imports -- it must be fully self-contained and immediately functional when opened directly in a browser.
 Produce exactly one file: index.html.
-${JSON_CONTRACT}`;
+${FILE_FORMAT}`;
   }
 
   if (stack === "react-localstorage") {
@@ -34,7 +43,7 @@ Produce exactly these files:
 - src/App.jsx (the entire app)
 - src/index.css (styling)
 ${REACT_FILE_RULES}
-${JSON_CONTRACT}`;
+${FILE_FORMAT}`;
   }
 
   return `Generate a small React app (Vite + React) that needs user accounts and/or a shared database via Supabase.
@@ -48,7 +57,7 @@ Produce exactly these files:
 - src/index.css (styling)
 - SUPABASE_SETUP.md (plain-language list of the tables/columns this app expects the user to create in their own Supabase project, since no backend is provisioned automatically)
 ${REACT_FILE_RULES}
-${JSON_CONTRACT}`;
+${FILE_FORMAT}`;
 }
 
 const QUALITY_BAR = `Build this to production-ready quality -- something the user could hand directly to real customers and charge money for today. That means:
@@ -58,7 +67,8 @@ const QUALITY_BAR = `Build this to production-ready quality -- something the use
 - Loading states: show a clear loading/pending indicator for anything asynchronous (initial load, submits, auth).
 - Empty states: every list, table, or feed needs a designed empty state for when there's no data yet, not a blank screen.
 - Accessible markup: semantic HTML elements, labels tied to inputs, sufficient color contrast, visible focus states, and keyboard operability.
-- Performance: avoid unnecessary re-renders, don't do expensive work on every keystroke/render, keep the bundle lean.`;
+- Performance: avoid unnecessary re-renders, don't do expensive work on every keystroke/render, keep the bundle lean.
+- Scope: generate the minimum viable complete app. Every core feature described below must actually work end to end, with no placeholder or "coming soon" sections -- but nothing beyond what was described. Keep this initial version focused and concise: a single well-structured file for static apps, or a minimal but complete set of files for React apps. The user can ask for additions afterward through the change-request flow.`;
 
 export function buildGenerationPrompt(stack: Stack, answers: IntakeAnswers): string {
   return `You are generating a web app from a short intake conversation.
@@ -74,7 +84,7 @@ ${stackInstructions(stack)}`;
 }
 
 export function buildChangeRequestPrompt(stack: Stack, currentFiles: string, request: string): string {
-  return `You are updating an existing generated web app based on a change request. Here are the current files as a JSON object:
+  return `You are updating an existing generated web app based on a change request. Here are the current files:
 
 ${currentFiles}
 

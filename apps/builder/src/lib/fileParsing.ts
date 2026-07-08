@@ -1,26 +1,35 @@
 import type { GeneratedFile } from "./types";
 
-// Claude is instructed to respond with only {"files":[...]}, but strip a
-// stray markdown fence or leading/trailing prose defensively before parsing.
+const FILE_PATTERN = /~~~FILE:(.+?)~~~\r?\n([\s\S]*?)\r?\n~~~ENDFILE~~~/g;
+
+// Claude streams each file wrapped in ~~~FILE:path~~~ ... ~~~ENDFILE~~~
+// markers instead of a JSON envelope -- large source files routinely contain
+// quotes, backslashes, and template literals that are easy for a model to
+// mis-escape inside a JSON string, and a single bad escape used to break the
+// entire parse. Plain delimited text sidesteps escaping entirely, and still
+// lets us recover every file that finished even if the response got cut off
+// partway through the last one.
 export function parseGeneratedFiles(raw: string): GeneratedFile[] {
-  const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
-  const candidate = fenced ? fenced[1] : raw;
-
-  const jsonMatch = candidate.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) {
-    throw new Error("Claude's response didn't contain a JSON files object.");
+  const files: GeneratedFile[] = [];
+  FILE_PATTERN.lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = FILE_PATTERN.exec(raw)) !== null) {
+    const path = match[1].trim();
+    const content = match[2];
+    if (path) files.push({ path, content });
   }
 
-  const parsed = JSON.parse(jsonMatch[0]) as { files?: GeneratedFile[] };
-  if (!parsed.files || !Array.isArray(parsed.files) || parsed.files.length === 0) {
-    throw new Error("Claude's response was missing a non-empty files array.");
+  if (files.length === 0) {
+    throw new Error(
+      "Claude's response didn't contain any complete files -- it may have been cut off before finishing. Try again, or describe a simpler app."
+    );
   }
 
-  for (const file of parsed.files) {
-    if (typeof file.path !== "string" || typeof file.content !== "string") {
-      throw new Error("Claude returned a file without a valid path/content.");
-    }
-  }
+  return files;
+}
 
-  return parsed.files;
+// Feeds the current file set back to Claude as context for a change request,
+// using the same marker format it's asked to respond in.
+export function serializeFiles(files: GeneratedFile[]): string {
+  return files.map((f) => `~~~FILE:${f.path}~~~\n${f.content}\n~~~ENDFILE~~~`).join("\n\n");
 }

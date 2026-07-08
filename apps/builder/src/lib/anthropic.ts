@@ -1,9 +1,17 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { buildGenerationPrompt, buildChangeRequestPrompt } from "./systemPrompts";
-import { parseGeneratedFiles } from "./fileParsing";
+import { parseGeneratedFiles, serializeFiles } from "./fileParsing";
 import type { GeneratedFile, IntakeAnswers, Stack } from "./types";
 
 export const MODEL = "claude-sonnet-4-6";
+
+// Generous headroom for a full multi-file app -- combined with the
+// conciseness constraint in the generation prompt, this should comfortably
+// cover a focused first version without truncating mid-file.
+const MAX_TOKENS = 16000;
+
+const TOO_SHORT_INSTRUCTION =
+  "\n\nYour previous attempt got cut off before it finished -- it was too long. This time, keep the app significantly shorter and simpler (fewer files, less code per file) while still being fully functional and complete.";
 
 function createClient(apiKey: string): Anthropic {
   return new Anthropic({ apiKey, dangerouslyAllowBrowser: true });
@@ -26,38 +34,58 @@ export function friendlyErrorMessage(err: unknown): string {
   return "Something went wrong talking to Anthropic.";
 }
 
-function extractText(message: Anthropic.Message): string {
-  const block = message.content.find((b) => b.type === "text");
-  if (!block || block.type !== "text") throw new Error("Claude didn't return any text.");
-  return block.text;
+// Streams the response and accumulates it as plain text (not JSON) -- see
+// fileParsing.ts for why the file transport itself is delimited text rather
+// than a JSON envelope.
+async function streamText(apiKey: string, prompt: string, onProgress?: (charsSoFar: number) => void): Promise<string> {
+  const client = createClient(apiKey);
+  const stream = client.messages.stream({
+    model: MODEL,
+    max_tokens: MAX_TOKENS,
+    messages: [{ role: "user", content: prompt }],
+  });
+  if (onProgress) {
+    stream.on("text", (_delta, snapshot) => onProgress(snapshot.length));
+  }
+  return stream.finalText();
+}
+
+// Runs a generation prompt and parses the result, retrying once with an
+// explicit "keep it shorter" instruction if the first attempt got cut off
+// before producing any complete files.
+async function generateWithRetry(
+  apiKey: string,
+  prompt: string,
+  onProgress?: (charsSoFar: number) => void
+): Promise<GeneratedFile[]> {
+  try {
+    const text = await streamText(apiKey, prompt, onProgress);
+    return parseGeneratedFiles(text);
+  } catch (err) {
+    if (!(err instanceof Error) || !err.message.includes("didn't contain any complete files")) {
+      throw err;
+    }
+    const retryText = await streamText(apiKey, prompt + TOO_SHORT_INSTRUCTION, onProgress);
+    return parseGeneratedFiles(retryText);
+  }
 }
 
 export async function generateApp(
   apiKey: string,
   stack: Stack,
-  answers: IntakeAnswers
+  answers: IntakeAnswers,
+  onProgress?: (charsSoFar: number) => void
 ): Promise<GeneratedFile[]> {
-  const client = createClient(apiKey);
-  const message = await client.messages.create({
-    model: MODEL,
-    max_tokens: 8192,
-    messages: [{ role: "user", content: buildGenerationPrompt(stack, answers) }],
-  });
-  return parseGeneratedFiles(extractText(message));
+  return generateWithRetry(apiKey, buildGenerationPrompt(stack, answers), onProgress);
 }
 
 export async function requestChange(
   apiKey: string,
   stack: Stack,
   currentFiles: GeneratedFile[],
-  request: string
+  request: string,
+  onProgress?: (charsSoFar: number) => void
 ): Promise<GeneratedFile[]> {
-  const client = createClient(apiKey);
-  const filesJson = JSON.stringify({ files: currentFiles });
-  const message = await client.messages.create({
-    model: MODEL,
-    max_tokens: 8192,
-    messages: [{ role: "user", content: buildChangeRequestPrompt(stack, filesJson, request) }],
-  });
-  return parseGeneratedFiles(extractText(message));
+  const prompt = buildChangeRequestPrompt(stack, serializeFiles(currentFiles), request);
+  return generateWithRetry(apiKey, prompt, onProgress);
 }
