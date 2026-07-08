@@ -43,8 +43,18 @@ export function ChatView({
   const [streamingText, setStreamingText] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  // Tracks the conversation id this component's local state is already in
+  // sync with. When sendMessage creates a conversation mid-send, it updates
+  // this ref immediately (see below) so that when the `conversation` prop
+  // later catches up to the same id, the sync effect below can tell this is
+  // just an echo of our own change -- not real navigation -- and skip
+  // clobbering the in-progress messages with the freshly-inserted (still
+  // empty) row from the server.
+  const knownConversationIdRef = useRef<string | null>(conversation?.id ?? null);
 
   useEffect(() => {
+    if (conversation?.id === knownConversationIdRef.current) return;
+    knownConversationIdRef.current = conversation?.id ?? null;
     setMessages(conversation?.messages ?? []);
     setConversationId(conversation?.id ?? null);
   }, [conversation?.id]);
@@ -105,6 +115,7 @@ export function ChatView({
         const created = await onCreateConversation();
         if (created) {
           id = created.id;
+          knownConversationIdRef.current = created.id;
           setConversationId(created.id);
           onConversationPersisted(created);
         }

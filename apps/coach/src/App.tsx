@@ -38,6 +38,12 @@ function CoachApp() {
   const [mode, setMode] = useState<"chat" | "builder">("chat");
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  // Bumped only on explicit navigation (picking a conversation or starting a
+  // new one) so ChatView remounts and resets its local state. It must NOT
+  // change when a brand-new conversation gets its id assigned mid-send --
+  // see handleConversationPersisted -- otherwise the in-progress reply gets
+  // wiped by the remount.
+  const [chatSessionKey, setChatSessionKey] = useState(0);
 
   if (apiKeyLoading) return null;
   if (!apiKey) return <MissingApiKey />;
@@ -55,18 +61,23 @@ function CoachApp() {
         activeId={activeConversationId}
         onSelect={(id) => {
           setActiveConversationId(id);
+          setChatSessionKey((k) => k + 1);
           setMode("chat");
           setSidebarOpen(false);
         }}
         onNew={() => {
           setActiveConversationId(null);
+          setChatSessionKey((k) => k + 1);
           setMode("chat");
           setSidebarOpen(false);
         }}
         onRename={renameConversation}
         onDelete={(id) => {
           deleteConversation(id);
-          if (id === activeConversationId) setActiveConversationId(null);
+          if (id === activeConversationId) {
+            setActiveConversationId(null);
+            setChatSessionKey((k) => k + 1);
+          }
         }}
         onOpenBuilder={() => {
           setMode("builder");
@@ -104,7 +115,7 @@ function CoachApp() {
             <ProductBuilderView apiKey={apiKey} brandProfile={brandProfile} onExit={() => setMode("chat")} />
           ) : (
             <ChatView
-              key={activeConversationId ?? "new"}
+              key={chatSessionKey}
               apiKey={apiKey}
               conversation={activeConversation}
               brandProfile={brandProfile}
