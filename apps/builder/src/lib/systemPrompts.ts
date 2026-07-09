@@ -122,8 +122,12 @@ ${answers.specialRequirements.trim() ? `Special requirements: ${answers.specialR
 ${stackInstructions(stack)}`;
 }
 
+const STYLE_PRESERVATION_RULE = `Preserve the existing design exactly -- do not regenerate the app's look from scratch. Specifically:
+- When modifying existing files, preserve all existing CSS classes, style imports, and design tokens exactly as they are. Only add or change the minimum code needed to implement the requested feature.
+- When adding new files, match the exact same styling patterns, class names, and design tokens used in the existing files -- do not invent a different visual style.`;
+
 export function buildChangeRequestPrompt(stack: Stack, currentFiles: string, request: string): string {
-  return `You are updating an existing generated web app based on a change request. Here are the current files:
+  return `You are updating an existing generated web app based on a change request. Here are the current files, exactly as they exist right now:
 
 ${currentFiles}
 
@@ -131,9 +135,11 @@ The user's change request: "${request}"
 
 Apply the requested change while keeping everything else working.
 
+${STYLE_PRESERVATION_RULE}
+
 ${QUALITY_BAR}
 
 ${stackInstructions(stack)}
 
-Return the COMPLETE, updated set of files (not a diff) -- every file the app needs, including any that didn't change.`;
+Return the COMPLETE, updated set of files (not a diff) -- every file the app needs, including any that didn't change. Files you return unchanged should be byte-for-byte identical to the versions shown above.`;
 }
