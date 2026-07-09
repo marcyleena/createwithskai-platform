@@ -23,32 +23,36 @@ const REACT_FILE_RULES = `Rules for src/App.jsx specifically, because it also ha
 function stackInstructions(stack: Stack): string {
   if (stack === "static-html") {
     return `Generate a single, complete HTML file with embedded <style> and <script> tags. No external dependencies, no build step, no imports -- it must be fully self-contained and immediately functional when opened directly in a browser.
-Produce exactly one file: index.html.
+Produce exactly one file, named exactly "index.html", and make it the first and only thing in your output.
 ${FILE_FORMAT}`;
   }
 
+  const entryFirstRule = `Output "src/App.jsx" FIRST, before any other file -- it is the app's entry point and the live preview depends on it. Producing it first guarantees it exists even if your response gets cut off before you finish the remaining files.`;
+
   if (stack === "react-localstorage") {
     return `Generate a small React app (Vite + React) that uses plain useState/useEffect and the browser's localStorage API to persist data between sessions.
-Produce exactly these files:
-- package.json (vite, react, react-dom as dependencies)
-- vite.config.js
-- index.html (loads /src/main.jsx as a module script)
-- src/main.jsx (mounts <App /> from src/App.jsx into #root)
-- src/App.jsx (the entire app)
+${entryFirstRule}
+Produce exactly these files, in this order:
+- src/App.jsx (the entire app -- FIRST)
 - src/index.css (styling)
+- src/main.jsx (mounts <App /> from src/App.jsx into #root)
+- index.html (loads /src/main.jsx as a module script)
+- vite.config.js
+- package.json (vite, react, react-dom as dependencies)
 ${REACT_FILE_RULES}
 ${FILE_FORMAT}`;
   }
 
   return `Generate a small React app (Vite + React) that needs user accounts and/or a shared database via Supabase.
 A Supabase client is already created and available as the global "window.supabase" -- call it directly from App.jsx (e.g. window.supabase.auth.signInWithPassword({ email, password }), window.supabase.from("table_name").select("*")). Do not import or create a Supabase client inside App.jsx.
-Produce exactly these files:
-- package.json (vite, react, react-dom, @supabase/supabase-js as dependencies)
-- vite.config.js
-- index.html
-- src/main.jsx (creates the real Supabase client from import.meta.env.VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY, assigns it to window.supabase, then mounts <App />)
-- src/App.jsx (the entire app, using window.supabase for every backend call)
+${entryFirstRule}
+Produce exactly these files, in this order:
+- src/App.jsx (the entire app, using window.supabase for every backend call -- FIRST)
 - src/index.css (styling)
+- src/main.jsx (creates the real Supabase client from import.meta.env.VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY, assigns it to window.supabase, then mounts <App />)
+- index.html
+- vite.config.js
+- package.json (vite, react, react-dom, @supabase/supabase-js as dependencies)
 - SUPABASE_SETUP.md (plain-language list of the tables/columns this app expects the user to create in their own Supabase project, since no backend is provisioned automatically)
 ${REACT_FILE_RULES}
 ${FILE_FORMAT}`;

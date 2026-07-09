@@ -18,6 +18,26 @@ function findFile(files: GeneratedFile[], suffix: string): GeneratedFile | undef
   return files.find((f) => f.path === suffix || f.path.endsWith(`/${suffix}`));
 }
 
+// Claude is instructed to name the entry point "src/App.jsx", but doesn't
+// always follow that exactly -- try the common variants, in order of
+// preference, before giving up. "index.html" is the last resort: if nothing
+// resembling a React entry point turned up, at least render whatever HTML
+// was generated instead of a dead end.
+const REACT_ENTRY_CANDIDATES = ["src/App.jsx", "App.jsx", "app.jsx", "src/App.tsx", "App.tsx", "index.jsx", "index.html"];
+
+function findEntryFile(files: GeneratedFile[]): GeneratedFile | undefined {
+  for (const candidate of REACT_ENTRY_CANDIDATES) {
+    const match = files.find(
+      (f) =>
+        f.path === candidate ||
+        f.path.endsWith(`/${candidate}`) ||
+        f.path.toLowerCase() === candidate.toLowerCase()
+    );
+    if (match) return match;
+  }
+  return undefined;
+}
+
 // Removes import/export statements from App.jsx so it can run as a plain
 // <script type="text/babel"> in the preview shell -- React and its hooks are
 // provided as pre-destructured globals instead (see buildReactPreviewDocument).
@@ -133,17 +153,32 @@ ${stack === "react-supabase" ? `<script>${MOCK_SUPABASE_CLIENT_SOURCE}</script>`
 // rendered as-is; React apps are stitched into a single Babel-standalone
 // page so hooks and JSX run for real without needing an actual bundler.
 export function buildPreviewDocument(files: GeneratedFile[], stack: Stack): string {
+  const paths = files.map((f) => f.path);
+  console.log("[previewBuilder] parsed files from generation output:", paths);
+
   if (stack === "static-html") {
     const html = findFile(files, "index.html");
+    if (!html) console.warn("[previewBuilder] no index.html found among parsed files:", paths);
     return html?.content ?? "<p>No index.html was generated.</p>";
   }
 
-  const appFile = findFile(files, "App.jsx");
-  const cssFile = findFile(files, "index.css");
+  const appFile = findEntryFile(files);
   if (!appFile) {
-    return "<p style='font-family:sans-serif;padding:2rem'>No src/App.jsx was generated.</p>";
+    console.warn("[previewBuilder] no recognizable entry point found among parsed files:", paths);
+    return `<p style="font-family:sans-serif;padding:2rem">No entry point (src/App.jsx, App.jsx, or index.html) was generated.<br />Files received: ${
+      paths.join(", ") || "(none)"
+    }</p>`;
+  }
+  console.log(`[previewBuilder] using "${appFile.path}" as the entry point`);
+
+  // Last-resort fallback: nothing resembling a React component was found,
+  // only a raw HTML file -- render it directly instead of feeding HTML
+  // through the JSX/Babel pipeline.
+  if (appFile.path.toLowerCase().endsWith(".html")) {
+    return appFile.content;
   }
 
+  const cssFile = findFile(files, "index.css");
   const appCode = stripModuleSyntax(appFile.content);
 
   return `<!doctype html>
@@ -154,7 +189,7 @@ export function buildPreviewDocument(files: GeneratedFile[], stack: Stack): stri
 </head>
 <body>
   <div id="root"></div>
-  <script type="text/babel" data-presets="react">
+  <script type="text/babel" data-presets="react,typescript">
     const { useState, useEffect, useRef, useMemo, useCallback, useContext, useReducer } = React;
 
     ${appCode}
