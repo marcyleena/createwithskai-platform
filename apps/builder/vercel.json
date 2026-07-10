@@ -4,5 +4,8 @@
   "buildCommand": "npm run build --workspace=builder",
   "outputDirectory": "dist",
   "installCommand": "cd ../.. && npm install",
+  "functions": {
+    "api/deploy.js": { "maxDuration": 60 }
+  },
   "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
 }
