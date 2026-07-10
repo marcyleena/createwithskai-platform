@@ -85,11 +85,11 @@ export function ApiKeyField({ provider, label, description, placeholder }: ApiKe
             className="sm:flex-1"
           />
           <div className="flex gap-2">
-            <Button type="submit" variant="secondary" disabled={saving || !value.trim()}>
+            <Button type="submit" variant="dark" disabled={saving || !value.trim()}>
               {saving ? "Saving…" : "Save"}
             </Button>
             {hasKey && (
-              <Button type="button" variant="outline" onClick={() => setEditing(false)}>
+              <Button type="button" variant="dark" onClick={() => setEditing(false)}>
                 Cancel
               </Button>
             )}

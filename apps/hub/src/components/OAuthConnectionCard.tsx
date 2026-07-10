@@ -43,7 +43,7 @@ export function OAuthConnectionCard({
         </div>
       </div>
       <Button
-        variant={connected ? "outline" : "secondary"}
+        variant="dark"
         disabled={comingSoon || busy}
         onClick={connected ? onDisconnect : onConnect}
         className="self-start sm:self-auto"
