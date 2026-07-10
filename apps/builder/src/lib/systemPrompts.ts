@@ -126,20 +126,32 @@ const STYLE_PRESERVATION_RULE = `Preserve the existing design exactly -- do not 
 - When modifying existing files, preserve all existing CSS classes, style imports, and design tokens exactly as they are. Only add or change the minimum code needed to implement the requested feature.
 - When adding new files, match the exact same styling patterns, class names, and design tokens used in the existing files -- do not invent a different visual style.`;
 
+// Deliberately NOT the same as stackInstructions() used for fresh generation
+// -- that text ("Generate a small React app...", "Produce exactly these
+// files") reads as a from-scratch spec, and landing at the end of a change
+// request prompt it tended to override the preservation instructions above
+// it. This keeps only the format/contract rules a change request still needs.
+function changeRequestFileRules(stack: Stack): string {
+  if (stack === "static-html") {
+    return `The app is a single "index.html" file. Return it wrapped in the same ~~~FILE:index.html~~~ / ~~~ENDFILE~~~ markers.
+${FILE_FORMAT}`;
+  }
+  return `${REACT_FILE_RULES}
+${FILE_FORMAT}`;
+}
+
 export function buildChangeRequestPrompt(stack: Stack, currentFiles: string, request: string): string {
-  return `You are updating an existing generated web app based on a change request. Here are the current files, exactly as they exist right now:
+  return `Here are the existing files in this app, exactly as they exist right now:
 
 ${currentFiles}
 
-The user's change request: "${request}"
-
-Apply the requested change while keeping everything else working.
+Make only the changes needed to implement this request: "${request}"
 
 ${STYLE_PRESERVATION_RULE}
 
 ${QUALITY_BAR}
 
-${stackInstructions(stack)}
+You are editing the files shown above -- you are not writing a new app from scratch, and the files above are not a reference example. Return ALL files from the app, including every one that doesn't need to change, using the same ~~~FILE:path~~~ delimiter format they were shown in above. A file that doesn't need to change must be returned byte-for-byte identical to the version shown above -- do not omit it, and do not rewrite it "for consistency" or any other reason.
 
-Return the COMPLETE, updated set of files (not a diff) -- every file the app needs, including any that didn't change. Files you return unchanged should be byte-for-byte identical to the versions shown above.`;
+${changeRequestFileRules(stack)}`;
 }

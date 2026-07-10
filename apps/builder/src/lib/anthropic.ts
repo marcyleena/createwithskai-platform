@@ -86,6 +86,23 @@ export async function requestChange(
   request: string,
   onProgress?: (charsSoFar: number) => void
 ): Promise<GeneratedFile[]> {
+  if (currentFiles.length === 0) {
+    // Nothing to send as context -- this would silently turn into a
+    // from-scratch generation, which is exactly the bug this guards against.
+    throw new Error("Can't apply a change request -- no existing files were found for this build.");
+  }
+
+  console.log(
+    "[requestChange] sending existing files as context:",
+    currentFiles.map((f) => `${f.path} (${f.content.length} chars)`)
+  );
+
   const prompt = buildChangeRequestPrompt(stack, serializeFiles(currentFiles), request);
-  return generateWithRetry(apiKey, prompt, onProgress);
+  const updatedFiles = await generateWithRetry(apiKey, prompt, onProgress);
+
+  // Full replacement, not a merge -- the response above already contains every
+  // file the app needs (the prompt requires unchanged files to be echoed back
+  // untouched), so merging with the old set here would only risk keeping a
+  // stale copy of a file Claude did intend to change.
+  return updatedFiles;
 }
