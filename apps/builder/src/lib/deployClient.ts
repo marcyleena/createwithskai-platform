@@ -3,7 +3,12 @@ import type { GeneratedFile } from "./types";
 export interface DeployResult {
   repoUrl: string;
   repoFullName: string;
+  // Clean production alias, e.g. https://project-name.vercel.app -- what the
+  // success screen links to.
   deploymentUrl: string;
+  // Raw per-deployment URL, e.g. https://project-name-<hash>-<account>.vercel.app
+  // -- kept for storage/debugging but not shown as the primary link.
+  previewUrl: string;
 }
 
 interface DeployParams {

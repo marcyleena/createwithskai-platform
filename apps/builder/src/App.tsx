@@ -154,7 +154,12 @@ function BuilderApp() {
     setAnswers(config.answers);
     setDeployResult(
       config.deploymentUrl && config.repoUrl && config.repoFullName
-        ? { deploymentUrl: config.deploymentUrl, repoUrl: config.repoUrl, repoFullName: config.repoFullName }
+        ? {
+            deploymentUrl: config.deploymentUrl,
+            repoUrl: config.repoUrl,
+            repoFullName: config.repoFullName,
+            previewUrl: config.previewUrl ?? config.deploymentUrl,
+          }
         : null
     );
     setDeployError(null);

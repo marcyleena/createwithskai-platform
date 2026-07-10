@@ -7,6 +7,11 @@
 // if they didn't, it would mean shipping the user's tokens into client JS.
 const REQUEST_TIMEOUT_MS = 20000; // fail a single stuck call well before the function's own maxDuration
 
+// Stay under vercel.json's maxDuration (60s) with headroom to still build and
+// send a response after polling ends.
+const FUNCTION_BUDGET_MS = 55000;
+const POLL_INTERVAL_MS = 2000;
+
 // A stalled upstream call (GitHub or Vercel) would otherwise hang until the
 // platform kills the whole function -- which drops the connection without a
 // real HTTP response and surfaces to the browser as a bare "Failed to fetch"
@@ -28,6 +33,49 @@ const GITHUB_HEADERS = (githubToken) => ({
   Accept: "application/vnd.github+json",
   "X-GitHub-Api-Version": "2022-11-28",
 });
+
+// Polls the deployment until Vercel finishes building it (or errors/cancels),
+// or until budgetMs runs out -- whichever comes first. The production alias
+// isn't reliably assigned until the deployment reaches a terminal state, but
+// we can't wait indefinitely inside a single serverless invocation.
+async function pollDeploymentUntilDone(deploymentId, vercelToken, budgetMs) {
+  const deadline = Date.now() + budgetMs;
+  let deployment = null;
+  while (Date.now() < deadline) {
+    const res = await fetchWithTimeout(`https://api.vercel.com/v13/deployments/${deploymentId}`, {
+      headers: { Authorization: `Bearer ${vercelToken}` },
+    });
+    if (res.ok) {
+      deployment = await res.json();
+      if (["READY", "ERROR", "CANCELED"].includes(deployment.readyState)) {
+        return deployment;
+      }
+    }
+    await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+  }
+  return deployment; // still building (or never fetched) -- caller falls back gracefully
+}
+
+// The clean production alias (project-name.vercel.app) is only visible via a
+// separate aliases lookup, not on the deployment object itself. If it isn't
+// assigned yet (or the lookup fails), fall back to the deterministic default
+// Vercel assigns a project on its first deployment -- same format the caller
+// is trying to surface anyway.
+async function getProductionAlias(deploymentId, vercelToken, repoName) {
+  const fallback = `${repoName}.vercel.app`;
+  try {
+    const res = await fetchWithTimeout(`https://api.vercel.com/v2/deployments/${deploymentId}/aliases`, {
+      headers: { Authorization: `Bearer ${vercelToken}` },
+    });
+    if (!res.ok) return fallback;
+    const body = await res.json();
+    const aliases = (body.aliases || []).map((a) => a.alias).filter((a) => a.endsWith(".vercel.app"));
+    if (aliases.length === 0) return fallback;
+    return aliases.includes(fallback) ? fallback : aliases.sort((a, b) => a.length - b.length)[0];
+  } catch {
+    return fallback;
+  }
+}
 
 export default async function handler(req, res) {
   if (req.method === "OPTIONS") {
@@ -51,6 +99,7 @@ export default async function handler(req, res) {
     return;
   }
 
+  const startedAt = Date.now();
   let stage = "verifying your GitHub account";
   try {
     // 1. Verify the GitHub token and find out who it belongs to.
@@ -120,10 +169,26 @@ export default async function handler(req, res) {
       throw new Error(deployment.error?.message || `Vercel rejected the deployment (${deployRes.status}).`);
     }
 
+    // 5. Wait for the build to finish (best-effort, budget permitting) so the
+    // production alias has a chance to be assigned, then look it up. The raw
+    // per-deployment URL always works as a fallback and gets stored alongside
+    // it, but the success screen should show the clean project alias instead.
+    stage = "waiting for the deployment to finish";
+    const pollBudget = FUNCTION_BUDGET_MS - (Date.now() - startedAt) - 5000;
+    const finalDeployment =
+      pollBudget > 0 ? await pollDeploymentUntilDone(deployment.id, vercelToken, pollBudget) : null;
+    if (finalDeployment?.readyState === "ERROR") {
+      throw new Error("The Vercel deployment failed during the build. Check the Vercel dashboard for details.");
+    }
+
+    stage = "looking up the production alias";
+    const productionAlias = await getProductionAlias(deployment.id, vercelToken, repoName);
+
     res.status(200).json({
       repoUrl: repo.html_url,
       repoFullName: repo.full_name,
-      deploymentUrl: `https://${deployment.url}`,
+      deploymentUrl: `https://${productionAlias}`,
+      previewUrl: `https://${deployment.url}`,
     });
   } catch (err) {
     res.status(500).json({ error: `Deployment failed while ${stage}: ${err.message || "unknown error"}` });

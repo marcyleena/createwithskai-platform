@@ -45,4 +45,5 @@ export interface BuildConfig {
   repoUrl?: string;
   repoFullName?: string;
   deploymentUrl?: string;
+  previewUrl?: string;
 }
