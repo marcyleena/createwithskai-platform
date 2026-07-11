@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useAuth } from '@createwithskai/auth';
-import { supabase } from '@createwithskai/api';
+import { supabase, getHubOrigin } from '@createwithskai/api';
 import { loadStorage, saveStorage, STORAGE_KEY, ALERTS_KEY, ALERTS_SEEN_KEY } from './utils';
 import Onboarding from './Onboarding';
 import Settings from './Settings';
@@ -127,6 +127,19 @@ export default function App() {
         top: 0,
         zIndex: 100,
       }}>
+        <a href={getHubOrigin()} title="Back to Hub" style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          color: '#C9BFA8',
+          fontSize: 13,
+          fontWeight: 500,
+          textDecoration: 'none',
+          marginRight: 20,
+          flexShrink: 0,
+        }}>
+          <HomeIcon />
+        </a>
         <div style={{
           width: 28, height: 28, borderRadius: '50%', background: accent,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -227,6 +240,15 @@ export default function App() {
         />
       )}
     </div>
+  );
+}
+
+function HomeIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 10.5 12 4l8 6.5" />
+      <path d="M6 9.5V19a1 1 0 0 0 1 1h3.5v-5h3v5H17a1 1 0 0 0 1-1V9.5" />
+    </svg>
   );
 }
 

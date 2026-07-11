@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useAuth, RequireAuth } from "@createwithskai/auth";
 import { getHubOrigin } from "@createwithskai/api";
-import { Button, Card } from "@createwithskai/ui";
+import { Button, Card, BackToHubLink } from "@createwithskai/ui";
 import type { AppBuild } from "@createwithskai/types";
 import { BuilderSidebar } from "./components/BuilderSidebar";
 import { IntakeWizard } from "./components/IntakeWizard";
@@ -203,6 +203,7 @@ function BuilderApp() {
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex flex-none items-center justify-between border-b border-taupe/30 bg-white px-4 py-3 sm:px-6">
           <div className="flex items-center gap-3">
+            <BackToHubLink href={getHubOrigin()} />
             <button
               type="button"
               onClick={() => setSidebarOpen(true)}
