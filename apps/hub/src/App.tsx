@@ -3,13 +3,18 @@ import { useAuth } from "@createwithskai/auth";
 import { MarketingPage } from "./pages/MarketingPage";
 import { Dashboard } from "./pages/Dashboard";
 import { LoginPage } from "./pages/LoginPage";
+import { OnboardingWizard } from "./components/onboarding/OnboardingWizard";
+import { useOnboarding } from "./hooks/useOnboarding";
 
 function RootPage() {
-  const { user, loading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+  const { completed, loading: onboardingLoading, markCompleted } = useOnboarding();
 
-  if (loading) return null;
+  if (authLoading) return null;
+  if (!user) return <MarketingPage />;
+  if (onboardingLoading || completed === null) return null;
 
-  return user ? <Dashboard /> : <MarketingPage />;
+  return completed ? <Dashboard /> : <OnboardingWizard onComplete={markCompleted} />;
 }
 
 export default function App() {

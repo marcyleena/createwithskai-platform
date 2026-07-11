@@ -5,8 +5,10 @@ import { SiteHeader } from "../components/SiteHeader";
 import { ToolNavCard } from "../components/ToolNavCard";
 import { ApiKeyField } from "../components/ApiKeyField";
 import { OAuthConnectionCard } from "../components/OAuthConnectionCard";
+import { GettingStartedChecklist } from "../components/dashboard/GettingStartedChecklist";
+import { NextStepPrompt } from "../components/dashboard/NextStepPrompt";
 import { CoachIcon, HqIcon, BuilderIcon, GitHubIcon, VercelIcon } from "../components/icons";
-import { useIdentities } from "../hooks/useIdentities";
+import { useGithubConnected } from "../hooks/useGithubConnected";
 
 const TOOL_LINKS = [
   {
@@ -31,11 +33,9 @@ const TOOL_LINKS = [
 
 export function Dashboard() {
   const { user, signOut } = useAuth();
-  const { identities, loading: identitiesLoading, connect, disconnect } = useIdentities();
+  const { connected: githubConnected, loading: githubLoading, connect, disconnect } = useGithubConnected();
   const [busyProvider, setBusyProvider] = useState<string | null>(null);
   const [oauthError, setOauthError] = useState<string | null>(null);
-
-  const isConnected = (provider: string) => identities.some((i) => i.provider === provider);
 
   async function handleConnect(provider: "github") {
     setBusyProvider(provider);
@@ -73,13 +73,17 @@ export function Dashboard() {
           <p className="text-espresso/70">Pick up where you left off in one of your tools.</p>
         </div>
 
+        <GettingStartedChecklist />
+
         <section className="mb-16 grid gap-6 sm:grid-cols-3">
           {TOOL_LINKS.map((tool) => (
             <ToolNavCard key={tool.title} {...tool} />
           ))}
         </section>
 
-        <section>
+        <NextStepPrompt />
+
+        <section id="profile-connections">
           <h2 className="mb-1 text-xl font-bold text-espresso">Profile &amp; connections</h2>
           <p className="mb-6 text-sm text-espresso/70">
             Manage the API keys and connected accounts your tools use on your behalf.
@@ -113,7 +117,7 @@ export function Dashboard() {
                   icon={<GitHubIcon className="h-5 w-5" />}
                   name="GitHub"
                   description="Needed so App Builder can push the code it generates for you."
-                  connected={!identitiesLoading && isConnected("github")}
+                  connected={!githubLoading && githubConnected}
                   busy={busyProvider === "github"}
                   onConnect={() => handleConnect("github")}
                   onDisconnect={() => handleDisconnect("github")}

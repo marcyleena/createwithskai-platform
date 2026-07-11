@@ -23,9 +23,13 @@ create table if not exists public.users (
   email text unique not null,
   full_name text,
   avatar_url text,
+  onboarding_completed boolean default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+-- Re-run-safe for tables created before this column existed.
+alter table public.users add column if not exists onboarding_completed boolean default false;
 
 drop trigger if exists set_updated_at on public.users;
 create trigger set_updated_at

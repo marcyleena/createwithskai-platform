@@ -15,7 +15,8 @@ supabase db push --db-url "postgresql://postgres:<password>@db.gsfejyokuxccpjghl
 
 ## What it creates
 
-- `public.users` — mirrors `auth.users`; a row is auto-created via trigger on signup.
+- `public.users` — mirrors `auth.users`; a row is auto-created via trigger on signup. Tracks
+  `onboarding_completed` so the hub only shows the first-time onboarding wizard once.
 - `user_credentials`, `brand_profiles`, `coach_conversations`, `product_builds`, `app_builds`,
   `hq_competitors`, `hq_content_calendar`, `integration_events` — all keyed by `user_id`.
 - Row Level Security on every table, scoped to `auth.uid()`, so each user can only read/write
