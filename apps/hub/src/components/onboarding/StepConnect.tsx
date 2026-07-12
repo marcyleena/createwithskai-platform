@@ -52,6 +52,28 @@ export function StepConnect({ onNext }: { onNext: () => void }) {
             }
           />
           <OnboardingGithubCard />
+          <OnboardingApiKeyCard
+            provider="vercel"
+            label="Vercel API token"
+            credentialType="api_token"
+            valueKey="token"
+            placeholder="Vercel API token"
+            description={
+              <>
+                Deploys what the App Builder generates straight to your own Vercel account. Get your
+                token at{" "}
+                <a
+                  href="https://vercel.com/account/tokens"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-accent-pink underline underline-offset-4"
+                >
+                  vercel.com/account/tokens
+                </a>
+                .
+              </>
+            }
+          />
         </div>
 
         <div className="mt-8 flex justify-center">

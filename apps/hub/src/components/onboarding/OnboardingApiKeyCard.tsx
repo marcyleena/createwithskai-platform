@@ -7,10 +7,22 @@ interface OnboardingApiKeyCardProps {
   provider: string;
   label: string;
   description: ReactNode;
+  placeholder?: string;
+  /** Defaults to "api_key" -- pass a different value for non-API-key credentials (e.g. Vercel's "api_token"). */
+  credentialType?: string;
+  /** Key inside the jsonb `value` column that holds the actual secret. Defaults to "api_key". */
+  valueKey?: string;
 }
 
-export function OnboardingApiKeyCard({ provider, label, description }: OnboardingApiKeyCardProps) {
-  const { credential, loading, save } = useCredential(provider);
+export function OnboardingApiKeyCard({
+  provider,
+  label,
+  description,
+  placeholder,
+  credentialType = "api_key",
+  valueKey = "api_key",
+}: OnboardingApiKeyCardProps) {
+  const { credential, loading, save } = useCredential(provider, credentialType);
   const [value, setValue] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -22,7 +34,7 @@ export function OnboardingApiKeyCard({ provider, label, description }: Onboardin
     if (!value.trim()) return;
     setSaving(true);
     setError(null);
-    const { error: saveError } = await save({ api_key: value.trim() });
+    const { error: saveError } = await save({ [valueKey]: value.trim() });
     setSaving(false);
     if (saveError) {
       setError(saveError);
@@ -47,7 +59,7 @@ export function OnboardingApiKeyCard({ provider, label, description }: Onboardin
             type="password"
             value={value}
             onChange={(e) => setValue(e.target.value)}
-            placeholder="Paste your API key"
+            placeholder={placeholder ?? "Paste your API key"}
             className="sm:flex-1"
           />
           <Button type="submit" variant="dark" disabled={saving || !value.trim()}>

@@ -7,7 +7,7 @@ import { ApiKeyField } from "../components/ApiKeyField";
 import { OAuthConnectionCard } from "../components/OAuthConnectionCard";
 import { GettingStartedChecklist } from "../components/dashboard/GettingStartedChecklist";
 import { NextStepPrompt } from "../components/dashboard/NextStepPrompt";
-import { CoachIcon, HqIcon, BuilderIcon, GitHubIcon, VercelIcon } from "../components/icons";
+import { CoachIcon, HqIcon, BuilderIcon, GitHubIcon } from "../components/icons";
 import { useGithubConnected } from "../hooks/useGithubConnected";
 
 const TOOL_LINKS = [
@@ -105,6 +105,27 @@ export function Dashboard() {
                   label="Apify"
                   description="Powers competitor and content research in Creator HQ."
                 />
+                <ApiKeyField
+                  provider="vercel"
+                  label="Vercel"
+                  description="Deploys what App Builder ships straight to your own account."
+                  placeholder="Vercel API token"
+                  credentialType="api_token"
+                  valueKey="token"
+                  helperText={
+                    <>
+                      Get your token at{" "}
+                      <a
+                        href="https://vercel.com/account/tokens"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-accent-pink underline underline-offset-4"
+                      >
+                        vercel.com/account/tokens
+                      </a>
+                    </>
+                  }
+                />
               </div>
             </div>
 
@@ -121,15 +142,6 @@ export function Dashboard() {
                   busy={busyProvider === "github"}
                   onConnect={() => handleConnect("github")}
                   onDisconnect={() => handleDisconnect("github")}
-                />
-                <OAuthConnectionCard
-                  icon={<VercelIcon className="h-5 w-5" />}
-                  name="Vercel"
-                  description="Deploys what App Builder ships straight to your own account."
-                  connected={false}
-                  comingSoon
-                  onConnect={() => {}}
-                  onDisconnect={() => {}}
                 />
               </div>
               {oauthError && <p className="mt-3 text-sm text-red-600">{oauthError}</p>}

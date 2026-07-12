@@ -36,6 +36,7 @@ export function GettingStartedChecklist() {
   const { user } = useAuth();
   const anthropic = useCredential("anthropic");
   const apify = useCredential("apify");
+  const vercel = useCredential("vercel", "api_token");
   const { connected: githubConnected, loading: githubLoading, connect } = useGithubConnected();
   const [githubBusy, setGithubBusy] = useState(false);
   const [githubError, setGithubError] = useState<string | null>(null);
@@ -50,12 +51,13 @@ export function GettingStartedChecklist() {
     setDismissed(localStorage.getItem(dismissKey) === "1");
   }, [dismissKey]);
 
-  const loading = anthropic.loading || apify.loading || githubLoading;
+  const loading = anthropic.loading || apify.loading || vercel.loading || githubLoading;
 
   const steps = [
     { done: Boolean(anthropic.credential) },
     { done: Boolean(apify.credential) },
     { done: githubConnected },
+    { done: Boolean(vercel.credential) },
   ];
   const completedCount = steps.filter((s) => s.done).length;
   const allComplete = completedCount === steps.length;
@@ -113,7 +115,7 @@ export function GettingStartedChecklist() {
       </button>
 
       {expanded && (
-        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <ChecklistCard done={steps[0].done} doneLabel="Anthropic API key">
             <a
               href="#profile-connections"
@@ -142,6 +144,14 @@ export function GettingStartedChecklist() {
                 {githubBusy ? "Connecting…" : "Connect"}
               </Button>
             </div>
+          </ChecklistCard>
+          <ChecklistCard done={steps[3].done} doneLabel="Vercel">
+            <a
+              href="#profile-connections"
+              className="text-sm font-medium text-espresso underline decoration-accent-pink underline-offset-4 hover:text-accent-pink"
+            >
+              Connect Vercel
+            </a>
           </ChecklistCard>
         </div>
       )}

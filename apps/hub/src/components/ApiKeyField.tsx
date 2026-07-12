@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
 import { Button, Input } from "@createwithskai/ui";
 import { useCredential } from "../hooks/useCredential";
 
@@ -7,10 +7,24 @@ interface ApiKeyFieldProps {
   label: string;
   description: string;
   placeholder?: string;
+  /** Defaults to "api_key" -- pass a different value for non-API-key credentials (e.g. Vercel's "api_token"). */
+  credentialType?: string;
+  /** Key inside the jsonb `value` column that holds the actual secret. Defaults to "api_key". */
+  valueKey?: string;
+  /** Small note rendered below the input, e.g. a link to where to get the credential. */
+  helperText?: ReactNode;
 }
 
-export function ApiKeyField({ provider, label, description, placeholder }: ApiKeyFieldProps) {
-  const { credential, loading, save, remove } = useCredential(provider);
+export function ApiKeyField({
+  provider,
+  label,
+  description,
+  placeholder,
+  credentialType = "api_key",
+  valueKey = "api_key",
+  helperText,
+}: ApiKeyFieldProps) {
+  const { credential, loading, save, remove } = useCredential(provider, credentialType);
   const [value, setValue] = useState("");
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -23,7 +37,7 @@ export function ApiKeyField({ provider, label, description, placeholder }: ApiKe
     if (!value.trim()) return;
     setSaving(true);
     setError(null);
-    const { error: saveError } = await save({ api_key: value.trim() });
+    const { error: saveError } = await save({ [valueKey]: value.trim() });
     setSaving(false);
     if (saveError) {
       setError(saveError);
@@ -96,6 +110,7 @@ export function ApiKeyField({ provider, label, description, placeholder }: ApiKe
           </div>
         </form>
       )}
+      {helperText && !(hasKey && !editing) && <p className="mt-2 text-xs text-espresso/50">{helperText}</p>}
       {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
     </div>
   );

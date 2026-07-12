@@ -270,7 +270,6 @@ function BuilderApp() {
                 <DeploySection
                   githubToken={github.value}
                   vercelToken={vercel.value}
-                  onSaveVercelToken={vercel.save}
                   onDeploy={handleDeploy}
                   deploying={deploying}
                   deployError={deployError}
