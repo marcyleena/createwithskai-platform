@@ -3,6 +3,7 @@ import { useAuth } from "@createwithskai/auth";
 import { MarketingPage } from "./pages/MarketingPage";
 import { Dashboard } from "./pages/Dashboard";
 import { LoginPage } from "./pages/LoginPage";
+import { ResetPasswordPage } from "./pages/ResetPasswordPage";
 import { OnboardingWizard } from "./components/onboarding/OnboardingWizard";
 import { useOnboarding } from "./hooks/useOnboarding";
 
@@ -22,6 +23,7 @@ export default function App() {
     <Routes>
       <Route path="/" element={<RootPage />} />
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
