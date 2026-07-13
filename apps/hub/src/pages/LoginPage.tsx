@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@createwithskai/auth";
 import { ROOT_DOMAIN, supabase } from "@createwithskai/api";
 import { Button, Card, Input } from "@createwithskai/ui";
@@ -82,7 +82,7 @@ export function LoginPage() {
   if (!authLoading && user) return null;
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-cream px-6">
+    <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-cream px-6 py-12">
       <Card className="w-full max-w-sm">
         <h1 className="mb-6 text-2xl font-bold text-espresso">
           {mode === "sign-in" ? "Sign in" : "Create an account"}
@@ -156,6 +156,10 @@ export function LoginPage() {
           {mode === "sign-in" ? "Need an account? Sign up" : "Already have an account? Sign in"}
         </button>
       </Card>
+
+      <Link to="/privacy" className="text-sm text-taupe hover:text-accent-pink">
+        Privacy Policy
+      </Link>
     </div>
   );
 }
