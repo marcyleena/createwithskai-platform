@@ -26,6 +26,19 @@ function jsonResponse(body: Record<string, unknown>, status: number): Response {
   });
 }
 
+// Supabase/Postgrest error messages can embed the email address that
+// triggered them (e.g. "A user with this email address has already been
+// registered"). Logging only the structured code/status keeps these logs
+// useful for debugging without ever writing the email itself.
+function logError(context: string, error: unknown): void {
+  if (error && typeof error === "object") {
+    const { code, status } = error as { code?: string; status?: number };
+    console.error(`create-user: ${context}`, { code: code ?? null, status: status ?? null });
+    return;
+  }
+  console.error(`create-user: ${context}`);
+}
+
 Deno.serve(async (req) => {
   if (req.method !== "POST") {
     return jsonResponse({ success: false, error: "Method not allowed" }, 405);
@@ -93,14 +106,14 @@ Deno.serve(async (req) => {
       });
 
       if (lookupError || !existing?.user) {
-        console.error("create-user: failed to look up existing user", lookupError);
+        logError("failed to look up existing user", lookupError);
         return jsonResponse({ success: false, error: "Failed to look up existing user" }, 500);
       }
 
       userId = existing.user.id;
       isNewUser = false;
     } else {
-      console.error("create-user: createUser failed", createError);
+      logError("createUser failed", createError);
       return jsonResponse(
         { success: false, error: createError?.message ?? "Failed to create user" },
         500
@@ -112,7 +125,7 @@ Deno.serve(async (req) => {
       .upsert({ id: userId, email }, { onConflict: "id" });
 
     if (upsertError) {
-      console.error("create-user: failed to upsert public.users row", upsertError);
+      logError("failed to upsert public.users row", upsertError);
       return jsonResponse({ success: false, error: "Failed to record user profile" }, 500);
     }
 
@@ -125,13 +138,13 @@ Deno.serve(async (req) => {
       if (resetError) {
         // The account already exists and is usable at this point — log and
         // continue rather than fail the whole webhook over the email step.
-        console.error("create-user: failed to send password reset email", resetError);
+        logError("failed to send password reset email", resetError);
       }
     }
 
     return jsonResponse({ success: true, user_id: userId }, 200);
   } catch (err) {
-    console.error("create-user: unexpected error", err);
+    logError("unexpected error", err);
     return jsonResponse({ success: false, error: "Unexpected server error" }, 500);
   }
 });

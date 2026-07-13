@@ -28,6 +28,11 @@ function isSecureContext(): boolean {
 // Same literal key in every app so all four read/write the same cookie.
 const STORAGE_KEY = "sb-createwithskai-auth";
 
+// Exposed for call sites that need to hit an edge function via a plain
+// fetch() instead of supabase.functions.invoke() -- see delete-user's caller
+// for why.
+export const SUPABASE_URL = supabaseUrl;
+
 // Untyped on purpose: see @createwithskai/types for the row shapes to cast
 // query results against at the call site (`data as SomeRowType`).
 export const supabase: SupabaseClient = createClient(supabaseUrl, supabaseAnonKey, {

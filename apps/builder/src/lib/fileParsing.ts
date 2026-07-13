@@ -20,7 +20,7 @@ export function parseGeneratedFiles(raw: string): GeneratedFile[] {
   }
 
   if (files.length === 0) {
-    console.warn("[fileParsing] no files parsed from generation output. Raw response:", raw);
+    console.warn(`[fileParsing] no files parsed from generation output (${raw.length} chars received).`);
     throw new Error(
       "Claude's response didn't contain any complete files -- it may have been cut off before finishing. Try again, or describe a simpler app."
     );

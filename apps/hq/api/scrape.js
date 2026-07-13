@@ -67,12 +67,7 @@ export default async function handler(req, res) {
         }
 
         const items = result.items || [];
-
-        if (items.length > 0) {
-          console.log(`[scrape] TikTok first item for @${account.handle}:`, JSON.stringify(items[0], null, 2));
-        } else {
-          console.log(`[scrape] TikTok returned 0 items for @${account.handle}`);
-        }
+        console.log(`[scrape] TikTok returned ${items.length} item(s) for @${account.handle}`);
 
         if (items[0]?.error) {
           throw new Error(items[0].errorDescription || 'No TikTok data returned');
@@ -111,12 +106,7 @@ export default async function handler(req, res) {
         }
 
         const items = result.items || [];
-
-        if (items.length > 0) {
-          console.log(`[scrape] Instagram first item for @${account.handle}:`, JSON.stringify(items[0], null, 2));
-        } else {
-          console.log(`[scrape] Instagram returned 0 items for @${account.handle}`);
-        }
+        console.log(`[scrape] Instagram returned ${items.length} item(s) for @${account.handle}`);
 
         if (items[0]?.error) {
           throw new Error(items[0].errorDescription || 'No Instagram data returned');

@@ -7,6 +7,7 @@ import { ApiKeyField } from "../components/ApiKeyField";
 import { OAuthConnectionCard } from "../components/OAuthConnectionCard";
 import { GettingStartedChecklist } from "../components/dashboard/GettingStartedChecklist";
 import { NextStepPrompt } from "../components/dashboard/NextStepPrompt";
+import { DeleteAccountSection } from "../components/dashboard/DeleteAccountSection";
 import { CoachIcon, HqIcon, BuilderIcon, GitHubIcon } from "../components/icons";
 import { useGithubConnected } from "../hooks/useGithubConnected";
 
@@ -147,6 +148,8 @@ export function Dashboard() {
               {oauthError && <p className="mt-3 text-sm text-red-600">{oauthError}</p>}
             </div>
           </div>
+
+          <DeleteAccountSection />
         </section>
       </main>
     </div>

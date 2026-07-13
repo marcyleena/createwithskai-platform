@@ -111,6 +111,10 @@ function CoachApp() {
           </div>
         </header>
 
+        <p className="flex-none border-b border-taupe/20 bg-cream px-4 py-1.5 text-center text-xs text-taupe sm:px-6">
+          Skai is an AI coach. Conversations may be used to improve your experience.
+        </p>
+
         <main className="min-h-0 flex-1">
           {mode === "builder" ? (
             <ProductBuilderView apiKey={apiKey} brandProfile={brandProfile} onExit={() => setMode("chat")} />
