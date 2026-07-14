@@ -48,6 +48,25 @@ function stripModuleSyntax(code: string): string {
     .replace(/export\s+default\s+/g, "");
 }
 
+// The preview iframe is sandboxed without `allow-same-origin`, which makes
+// the real `window.localStorage` accessor throw a SecurityError on first
+// touch instead of just being absent -- generated apps that use localStorage
+// for persistence would otherwise crash the whole preview on load. A `const
+// localStorage = {...}` declared in its own top-level script shadows the
+// global identifier for every script that runs after it (App.jsx included),
+// without ever touching the real `window.localStorage` property that throws.
+const MOCK_LOCAL_STORAGE_SOURCE = `
+const _storage = {};
+const localStorage = {
+  getItem: (k) => _storage[k] ?? null,
+  setItem: (k, v) => { _storage[k] = String(v); },
+  removeItem: (k) => { delete _storage[k]; },
+  clear: () => { Object.keys(_storage).forEach(k => delete _storage[k]); },
+  key: (i) => Object.keys(_storage)[i] ?? null,
+  get length() { return Object.keys(_storage).length; }
+};
+`;
+
 // A minimal in-memory mock of the supabase-js client surface, so
 // react-supabase previews are fully interactive without ever touching the
 // platform's real Supabase project. Data resets whenever the preview reloads.
@@ -143,6 +162,7 @@ window.supabase = (function () {
 
 function reactPreviewHead(css: string, stack: Stack): string {
   return `<style>${css}</style>
+<script>${MOCK_LOCAL_STORAGE_SOURCE}</script>
 <script>${escapeScriptClose(reactSource)}</script>
 <script>${escapeScriptClose(reactDomSource)}</script>
 <script>${escapeScriptClose(babelSource)}</script>

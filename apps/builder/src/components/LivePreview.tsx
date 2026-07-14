@@ -33,6 +33,9 @@ export function LivePreview({ files, stack }: LivePreviewProps) {
         <span className="h-2.5 w-2.5 rounded-full bg-taupe/60" />
         <span className="ml-2 text-xs font-medium text-espresso/60">Live preview</span>
       </div>
+      <div className="flex-none border-b border-taupe/20 bg-pink/10 px-3 py-1.5 text-center text-xs text-taupe">
+        Preview mode -- data resets on refresh. Your deployed app will save data normally.
+      </div>
       {blobUrl ? (
         <iframe
           key={blobUrl}
