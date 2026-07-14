@@ -7,6 +7,7 @@ import { BuilderSidebar } from "./components/BuilderSidebar";
 import { IntakeWizard } from "./components/IntakeWizard";
 import { LivePreview } from "./components/LivePreview";
 import { ChangeRequestBar } from "./components/ChangeRequestBar";
+import { PostGenerationGuide } from "./components/PostGenerationGuide";
 import { DeploySection } from "./components/DeploySection";
 import { useApiKey } from "./hooks/useApiKey";
 import { useCredential } from "./hooks/useCredential";
@@ -249,33 +250,37 @@ function BuilderApp() {
           )}
 
           {mode === "build" && (
-            <div className="mx-auto flex max-w-6xl flex-col gap-4 p-4 sm:p-6 lg:flex-row lg:items-start">
-              <div className="flex min-w-0 flex-1 flex-col gap-3">
-                <div className="flex items-center justify-between gap-3">
-                  <h2 className="truncate text-lg font-semibold text-espresso">{buildName}</h2>
-                  <span className="flex-none rounded-full bg-taupe/20 px-3 py-1 text-xs font-medium text-espresso/70">
-                    {STACK_LABELS[stack]}
-                  </span>
-                </div>
-
-                <div className="h-[420px] sm:h-[520px]">
-                  <LivePreview files={files} stack={stack} />
-                </div>
-
-                <ChangeRequestBar onSubmit={handleChangeRequest} disabled={changeRequesting} />
-                {changeError && <p className="text-sm text-red-600">{changeError}</p>}
+            <div className="mx-auto flex max-w-4xl flex-col gap-4 p-4 sm:p-6">
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="truncate text-lg font-semibold text-espresso">{buildName}</h2>
+                <span className="flex-none rounded-full bg-taupe/20 px-3 py-1 text-xs font-medium text-espresso/70">
+                  {STACK_LABELS[stack]}
+                </span>
               </div>
 
-              <div className="w-full flex-none lg:w-80">
-                <DeploySection
-                  githubToken={github.value}
-                  vercelToken={vercel.value}
-                  onDeploy={handleDeploy}
-                  deploying={deploying}
-                  deployError={deployError}
-                  result={deployResult}
-                />
+              <div className="h-[420px] sm:h-[520px]">
+                <LivePreview files={files} stack={stack} />
               </div>
+
+              <ChangeRequestBar onSubmit={handleChangeRequest} disabled={changeRequesting} />
+              {changeError && <p className="text-sm text-red-600">{changeError}</p>}
+
+              <PostGenerationGuide
+                key={activeBuildId ?? "new"}
+                answers={answers}
+                deployResult={deployResult}
+                onAddFeature={handleChangeRequest}
+                addingFeature={changeRequesting}
+              />
+
+              <DeploySection
+                githubToken={github.value}
+                vercelToken={vercel.value}
+                onDeploy={handleDeploy}
+                deploying={deploying}
+                deployError={deployError}
+                result={deployResult}
+              />
             </div>
           )}
         </main>
