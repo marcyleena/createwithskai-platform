@@ -126,6 +126,11 @@ const STYLE_PRESERVATION_RULE = `Preserve the existing design exactly -- do not 
 - When modifying existing files, preserve all existing CSS classes, style imports, and design tokens exactly as they are. Only add or change the minimum code needed to implement the requested feature.
 - When adding new files, match the exact same styling patterns, class names, and design tokens used in the existing files -- do not invent a different visual style.`;
 
+const SURGICAL_EDIT_RULE = `Be surgical about this change:
+- Only rewrite the files that actually need new or changed code to implement the request. Every other file must still be returned, but byte-for-byte identical to the version shown above -- do not "improve" or refactor files the request doesn't touch.
+- Prioritize completing what you start over maximizing scope. A response that gets cut off mid-file because it tried to do too much is worse than a smaller but fully working implementation -- finish every file you start before spending effort on nice-to-haves the request didn't ask for.
+- If a requested feature would require more than 300 lines of new code, implement a simplified but functional version first. The user can request enhancements afterward.`;
+
 // Deliberately NOT the same as stackInstructions() used for fresh generation
 // -- that text ("Generate a small React app...", "Produce exactly these
 // files") reads as a from-scratch spec, and landing at the end of a change
@@ -148,6 +153,8 @@ ${currentFiles}
 Make only the changes needed to implement this request: "${request}"
 
 ${STYLE_PRESERVATION_RULE}
+
+${SURGICAL_EDIT_RULE}
 
 ${QUALITY_BAR}
 
