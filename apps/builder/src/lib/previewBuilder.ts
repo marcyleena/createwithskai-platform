@@ -5,6 +5,7 @@ import reactSource from "../../../../node_modules/react/umd/react.development.js
 import reactDomSource from "../../../../node_modules/react-dom/umd/react-dom.development.js?raw";
 import babelSource from "@babel/standalone/babel.min.js?raw";
 import type { GeneratedFile, Stack } from "./types";
+import { findFile, findEntryFile } from "./fileLookup";
 
 // Libraries are bundled from node_modules and inlined directly into the
 // preview document (rather than loaded from a CDN) so the live preview
@@ -12,30 +13,6 @@ import type { GeneratedFile, Stack } from "./types";
 // depends on a third party being reachable.
 function escapeScriptClose(source: string): string {
   return source.replace(/<\/script/gi, "<\\/script");
-}
-
-function findFile(files: GeneratedFile[], suffix: string): GeneratedFile | undefined {
-  return files.find((f) => f.path === suffix || f.path.endsWith(`/${suffix}`));
-}
-
-// Claude is instructed to name the entry point "src/App.jsx", but doesn't
-// always follow that exactly -- try the common variants, in order of
-// preference, before giving up. "index.html" is the last resort: if nothing
-// resembling a React entry point turned up, at least render whatever HTML
-// was generated instead of a dead end.
-const REACT_ENTRY_CANDIDATES = ["src/App.jsx", "App.jsx", "app.jsx", "src/App.tsx", "App.tsx", "index.jsx", "index.html"];
-
-function findEntryFile(files: GeneratedFile[]): GeneratedFile | undefined {
-  for (const candidate of REACT_ENTRY_CANDIDATES) {
-    const match = files.find(
-      (f) =>
-        f.path === candidate ||
-        f.path.endsWith(`/${candidate}`) ||
-        f.path.toLowerCase() === candidate.toLowerCase()
-    );
-    if (match) return match;
-  }
-  return undefined;
 }
 
 // Removes import/export statements from App.jsx so it can run as a plain

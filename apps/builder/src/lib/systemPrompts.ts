@@ -127,7 +127,7 @@ const STYLE_PRESERVATION_RULE = `Preserve the existing design exactly -- do not 
 - When adding new files, match the exact same styling patterns, class names, and design tokens used in the existing files -- do not invent a different visual style.`;
 
 const SURGICAL_EDIT_RULE = `Be surgical about this change:
-- Only rewrite the files that actually need new or changed code to implement the request. Every other file must still be returned, but byte-for-byte identical to the version shown above -- do not "improve" or refactor files the request doesn't touch.
+- Only touch files that actually need new or changed code to implement the request -- see the diff instructions below for exactly what to return. Do not "improve" or refactor files the request doesn't touch.
 - Prioritize completing what you start over maximizing scope. A response that gets cut off mid-file because it tried to do too much is worse than a smaller but fully working implementation -- finish every file you start before spending effort on nice-to-haves the request didn't ask for.
 - If a requested feature would require more than 300 lines of new code, implement a simplified but functional version first. The user can request enhancements afterward.`;
 
@@ -145,10 +145,18 @@ ${FILE_FORMAT}`;
 ${FILE_FORMAT}`;
 }
 
-export function buildChangeRequestPrompt(stack: Stack, currentFiles: string, request: string): string {
-  return `Here are the existing files in this app, exactly as they exist right now:
+export function buildChangeRequestPrompt(
+  stack: Stack,
+  allFilePaths: string[],
+  relevantFiles: string,
+  request: string
+): string {
+  return `This app already exists. Its complete list of files is:
+${allFilePaths.map((p) => `- ${p}`).join("\n")}
 
-${currentFiles}
+You were sent the full current content of only the file(s) most likely relevant to this request, exactly as they exist right now:
+
+${relevantFiles}
 
 Make only the changes needed to implement this request: "${request}"
 
@@ -158,7 +166,7 @@ ${SURGICAL_EDIT_RULE}
 
 ${QUALITY_BAR}
 
-You are editing the files shown above -- you are not writing a new app from scratch, and the files above are not a reference example. Return ALL files from the app, including every one that doesn't need to change, using the same ~~~FILE:path~~~ delimiter format they were shown in above. A file that doesn't need to change must be returned byte-for-byte identical to the version shown above -- do not omit it, and do not rewrite it "for consistency" or any other reason.
+You are editing an existing app, not writing a new one from scratch, and the file(s) above are not a reference example. This is a diff, not a full regeneration: return ONLY the files you actually created or changed to implement this request, using the ~~~FILE:path~~~ delimiter format below. Do not return a file whose content isn't changing -- every file not in your response stays exactly as it already is, so omitting an unchanged file is correct, not an oversight. If implementing this request genuinely requires changing a file that wasn't shown above, you may still return it, but only when you have a real, specific reason to change its content -- not out of caution.
 
 ${changeRequestFileRules(stack)}`;
 }

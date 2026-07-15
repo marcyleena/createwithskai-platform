@@ -39,3 +39,19 @@ export function parseGeneratedFiles(raw: string): GeneratedFile[] {
 export function serializeFiles(files: GeneratedFile[]): string {
   return files.map((f) => `~~~FILE:${f.path}~~~\n${f.content}\n~~~ENDFILE~~~`).join("\n\n");
 }
+
+// Merges a diff-style response (only the files Claude actually created or
+// modified for a change request) into the complete original file set --
+// replaces matching paths in place, appends any genuinely new ones, and
+// leaves every other file untouched. This is what keeps a change request
+// that only needed to touch one or two files from losing the rest of the
+// app, since Claude's response no longer contains them at all.
+export function mergeFiles(original: GeneratedFile[], changes: GeneratedFile[]): GeneratedFile[] {
+  const merged = [...original];
+  for (const changed of changes) {
+    const index = merged.findIndex((f) => f.path === changed.path);
+    if (index >= 0) merged[index] = changed;
+    else merged.push(changed);
+  }
+  return merged;
+}

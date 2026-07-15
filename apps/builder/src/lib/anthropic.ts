@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { buildGenerationPrompt, buildChangeRequestPrompt } from "./systemPrompts";
-import { parseGeneratedFiles, serializeFiles } from "./fileParsing";
+import { parseGeneratedFiles, serializeFiles, mergeFiles } from "./fileParsing";
+import { selectRelevantFiles } from "./fileLookup";
 import type { GeneratedFile, IntakeAnswers, Stack } from "./types";
 
 export const MODEL = "claude-sonnet-4-6";
@@ -92,17 +93,19 @@ export async function requestChange(
     throw new Error("Can't apply a change request -- no existing files were found for this build.");
   }
 
+  const relevantFiles = selectRelevantFiles(currentFiles, stack);
   console.log(
-    "[requestChange] sending existing files as context:",
-    currentFiles.map((f) => `${f.path} (${f.content.length} chars)`)
+    "[requestChange] sending relevant files as context:",
+    relevantFiles.map((f) => `${f.path} (${f.content.length} chars)`)
   );
 
-  const prompt = buildChangeRequestPrompt(stack, serializeFiles(currentFiles), request);
-  const updatedFiles = await generateWithRetry(apiKey, prompt, onProgress);
+  const allPaths = currentFiles.map((f) => f.path);
+  const prompt = buildChangeRequestPrompt(stack, allPaths, serializeFiles(relevantFiles), request);
+  const changedFiles = await generateWithRetry(apiKey, prompt, onProgress);
 
-  // Full replacement, not a merge -- the response above already contains every
-  // file the app needs (the prompt requires unchanged files to be echoed back
-  // untouched), so merging with the old set here would only risk keeping a
-  // stale copy of a file Claude did intend to change.
-  return updatedFiles;
+  // Claude now only returns the files it actually created or modified (see
+  // buildChangeRequestPrompt) -- merge those into the complete existing set
+  // instead of replacing it, so files outside the relevant subset are never
+  // dropped just because they weren't part of the response.
+  return mergeFiles(currentFiles, changedFiles);
 }
