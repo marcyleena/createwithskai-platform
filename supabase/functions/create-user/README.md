@@ -13,8 +13,19 @@ and linked to this project.
 ```sh
 supabase login
 supabase link --project-ref gsfejyokuxccpjghlfzb
-supabase functions deploy create-user
+supabase functions deploy create-user --no-verify-jwt
 ```
+
+`--no-verify-jwt` is required, not optional. By default Supabase's platform
+gateway requires every edge function request to carry a valid `Authorization`
+JWT and rejects anything else with `"Missing authorization header"` *before*
+this function's own code ever runs. n8n is calling this function
+server-to-server with only the custom `x-webhook-secret` header below (see
+the n8n config -- `Authentication: None`, no `Authorization` header at all),
+so without `--no-verify-jwt` every call 401s at the gateway regardless of
+whether the webhook secret is correct. If this function is ever redeployed
+without that flag (e.g. via `supabase functions deploy` with no arguments,
+which redeploys everything), n8n calls will start failing again.
 
 ## Set environment variables
 
@@ -65,3 +76,8 @@ Notes:
   `{ "success": false, "error": "..." }` otherwise — you can branch on the
   HTTP status in n8n (e.g. an IF node checking the response status) to alert
   on failures.
+- A `401` with `"error": "Missing x-webhook-secret header"` means the header
+  itself never arrived (check the HTTP Request node's headers, or that
+  `--no-verify-jwt` is actually deployed -- see above). `"Incorrect
+  x-webhook-secret"` means the header arrived but its value doesn't match
+  what `supabase secrets set WEBHOOK_SECRET=...` was set to.

@@ -5,7 +5,17 @@
 // mirrors it into public.users, and sends them a password-reset email that
 // doubles as their welcome email / account-setup link.
 //
-// Deploy: supabase functions deploy create-user
+// Authentication is the x-webhook-secret header alone -- this is a
+// server-to-server call from n8n, not a user request, so it never sends a
+// Supabase Authorization/JWT header. Supabase's platform gateway requires a
+// valid Authorization header on every function by default (verify_jwt) and
+// rejects requests without one -- with "Missing authorization header" --
+// before the function code below ever runs. That gate is deploy-time
+// config, not something this file can override, so this function MUST be
+// deployed with --no-verify-jwt (see README in this folder) or every
+// webhook call will 401 at the gateway regardless of what's implemented here.
+//
+// Deploy: supabase functions deploy create-user --no-verify-jwt
 // Secrets: supabase secrets set WEBHOOK_SECRET=...
 //   (SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are reserved names Supabase
 //   injects automatically into every edge function — see README in this folder.)
@@ -50,8 +60,12 @@ Deno.serve(async (req) => {
     return jsonResponse({ success: false, error: "Server misconfigured" }, 500);
   }
 
-  if (req.headers.get("x-webhook-secret") !== webhookSecret) {
-    return jsonResponse({ success: false, error: "Unauthorized" }, 401);
+  const providedSecret = req.headers.get("x-webhook-secret");
+  if (!providedSecret) {
+    return jsonResponse({ success: false, error: "Missing x-webhook-secret header" }, 401);
+  }
+  if (providedSecret !== webhookSecret) {
+    return jsonResponse({ success: false, error: "Incorrect x-webhook-secret" }, 401);
   }
 
   let payload: CreateUserPayload;
