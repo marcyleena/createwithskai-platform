@@ -147,7 +147,7 @@ Deno.serve(async (req) => {
     // shouldn't get another "set your password" email every time.
     if (isNewUser) {
       const { error: resetError } = await supabaseAdmin.auth.resetPasswordForEmail(email, {
-        redirectTo: "https://createwithskai.cloud/login",
+        redirectTo: "https://createwithskai.cloud/reset-password",
       });
       if (resetError) {
         // The account already exists and is usable at this point — log and
