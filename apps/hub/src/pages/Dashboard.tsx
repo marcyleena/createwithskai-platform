@@ -156,7 +156,7 @@ export function Dashboard() {
 
       <footer className="border-t border-taupe/30 px-6 py-8">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-2 text-sm text-espresso/60 sm:flex-row">
-          <span>The AI Influencer Launchpad by Skai Monroe</span>
+          <span>The AI Business Launchpad by Skai Monroe</span>
           <div className="flex items-center gap-4">
             <Link to="/privacy" className="text-taupe hover:text-accent-pink">
               Privacy Policy

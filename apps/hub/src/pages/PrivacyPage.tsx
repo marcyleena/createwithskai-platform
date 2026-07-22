@@ -31,7 +31,7 @@ export function PrivacyPage() {
           <section>
             <h2 className="mb-3 text-xl font-bold text-accent-pink">Who we are</h2>
             <p className="leading-relaxed">
-              The AI Influencer Launchpad is a product of the Create With Skai brand. For any
+              The AI Business Launchpad is a product of the Create With Skai brand. For any
               questions or concerns you can contact us at{" "}
               <ExternalLink href="mailto:createwithskai@gmail.com">createwithskai@gmail.com</ExternalLink>.
             </p>

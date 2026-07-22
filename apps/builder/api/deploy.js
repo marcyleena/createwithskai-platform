@@ -120,7 +120,7 @@ export default async function handler(req, res) {
         name: repoName,
         private: false,
         auto_init: false,
-        description: "Generated with AI Influencer Launchpad App Builder",
+        description: "Generated with AI Business Launchpad App Builder",
       }),
     });
     if (!createRepoRes.ok) {

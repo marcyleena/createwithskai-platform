@@ -100,7 +100,7 @@ function CoachApp() {
               <MenuIcon className="h-4 w-4" />
             </button>
             <a href={getHubOrigin()} className="text-lg font-semibold text-espresso">
-              Coach <span className="text-accent-pink">by Skai Monroe</span>
+              Coach
             </a>
           </div>
           <div className="flex items-center gap-3">

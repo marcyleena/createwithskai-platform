@@ -214,7 +214,7 @@ function BuilderApp() {
               <MenuIcon className="h-4 w-4" />
             </button>
             <a href={getHubOrigin()} className="text-lg font-semibold text-espresso">
-              Builder <span className="text-accent-pink">by Skai Monroe</span>
+              Builder
             </a>
           </div>
           <div className="flex items-center gap-3">

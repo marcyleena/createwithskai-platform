@@ -1,4 +1,4 @@
-// Shared domain types for the AI Influencer Launchpad platform.
+// Shared domain types for the AI Business Launchpad platform.
 // These mirror the Supabase `public` schema defined in supabase/schema.sql.
 
 export interface AppUser {

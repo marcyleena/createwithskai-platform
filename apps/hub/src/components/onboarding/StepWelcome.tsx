@@ -7,7 +7,7 @@ export function StepWelcome({ onNext }: { onNext: () => void }) {
     <div className="flex flex-1 flex-col items-center justify-center px-6 py-12 sm:py-16">
       <div className="mx-auto max-w-5xl text-center">
         <h1 className="mb-3 text-3xl font-bold text-espresso sm:text-4xl">
-          Welcome to the AI Influencer Launchpad.
+          Welcome to the AI Business Launchpad.
         </h1>
         <p className="mx-auto mb-10 max-w-2xl text-espresso/70 sm:text-lg">
           You have everything you need to build a real AI-powered digital business. Let us show you how it

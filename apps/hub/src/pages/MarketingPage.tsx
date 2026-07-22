@@ -9,7 +9,7 @@ const STAN_STORE_URL = "https://stan.store/createwithskai";
 const TOOLS = [
   {
     icon: <CoachIcon className="h-6 w-6" />,
-    title: "Skai AI Influencer Coach",
+    title: "Skai AI Business Coach",
     description:
       "Talk through your niche, your voice, and your next move with an AI trained on what actually works for creators. Coach turns that conversation into a brand profile and a content plan.",
   },
@@ -41,7 +41,7 @@ export function MarketingPage() {
         <section className="px-6 pb-16 pt-16 sm:pb-20 sm:pt-24">
           <div className="mx-auto max-w-3xl text-center">
             <p className="mb-4 text-sm font-semibold uppercase tracking-wide text-accent-pink">
-              The AI Influencer Launchpad
+              The AI Business Launchpad
             </p>
             <h1 className="mb-6 text-4xl font-bold leading-tight text-espresso sm:text-5xl">
               Build an influencer brand without guessing your way through it.
@@ -137,7 +137,7 @@ export function MarketingPage() {
 
       <footer className="border-t border-taupe/30 px-6 py-8">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-2 text-sm text-espresso/60 sm:flex-row">
-          <span>The AI Influencer Launchpad by Skai Monroe</span>
+          <span>The AI Business Launchpad by Skai Monroe</span>
           <div className="flex items-center gap-4">
             <Link to="/privacy" className="text-taupe hover:text-accent-pink">
               Privacy Policy
