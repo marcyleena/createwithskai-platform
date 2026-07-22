@@ -42,7 +42,7 @@ function MissingApiKey() {
 function BuilderApp() {
   const { user, signOut } = useAuth();
   const { apiKey, loading: apiKeyLoading } = useApiKey();
-  const { builds, createBuild, updateBuild, deleteBuild } = useBuilds(user?.id);
+  const { builds, createBuild, updateBuild, deleteBuild, hasMore, loadingMore, loadMore } = useBuilds(user?.id);
   const github = useCredential({ provider: "github", credentialType: "oauth_token", valueKey: "access_token" });
   const vercel = useCredential({ provider: "vercel", credentialType: "api_token", valueKey: "token" });
 
@@ -58,6 +58,7 @@ function BuilderApp() {
   const [generateError, setGenerateError] = useState<string | null>(null);
   const [generateProgress, setGenerateProgress] = useState(0);
   const [changeRequesting, setChangeRequesting] = useState(false);
+  const [changeProgress, setChangeProgress] = useState(0);
   const [changeError, setChangeError] = useState<string | null>(null);
   const [deploying, setDeploying] = useState(false);
   const [deployError, setDeployError] = useState<string | null>(null);
@@ -107,8 +108,9 @@ function BuilderApp() {
   async function handleChangeRequest(request: string) {
     setChangeRequesting(true);
     setChangeError(null);
+    setChangeProgress(0);
     try {
-      const updatedFiles = await requestChange(apiKey!, stack, files, request);
+      const updatedFiles = await requestChange(apiKey!, stack, files, request, setChangeProgress);
       setFiles(updatedFiles);
       if (activeBuildId && answers) {
         const config: BuildConfig = { answers, stack, files: updatedFiles };
@@ -199,6 +201,9 @@ function BuilderApp() {
         onDelete={handleDeleteBuild}
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
+        hasMore={hasMore}
+        loadingMore={loadingMore}
+        onLoadMore={loadMore}
       />
 
       <div className="flex min-w-0 flex-1 flex-col">
@@ -263,6 +268,9 @@ function BuilderApp() {
               </div>
 
               <ChangeRequestBar onSubmit={handleChangeRequest} disabled={changeRequesting} />
+              {changeRequesting && changeProgress > 0 && (
+                <p className="text-xs text-espresso/40">{changeProgress.toLocaleString()} characters generated</p>
+              )}
               {changeError && <p className="text-sm text-red-600">{changeError}</p>}
 
               <PostGenerationGuide

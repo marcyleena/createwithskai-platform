@@ -65,6 +65,11 @@ const QUALITY_BAR = `Build this to production-ready quality -- something the use
 - Loading states: show a clear loading/pending indicator for anything asynchronous (initial load, submits, auth).
 - Empty states: every list, table, or feed needs a designed empty state for when there's no data yet, not a blank screen.
 - Accessible markup: semantic HTML elements, labels tied to inputs, sufficient color contrast, visible focus states, and keyboard operability.
+- Icon-only buttons: if a button has only an icon and no visible text, give it a descriptive "title" attribute and an "aria-label" for accessibility.
+- Optimistic UI: when a user submits a form, saves data, or toggles a setting, update the UI immediately rather than waiting for a server response -- then handle server errors gracefully with a revert if the operation fails.
+- Pagination: any list that could grow over time (transactions, entries, posts, records, history) must never load all records at once -- use a page size of 20 items with a load more button or infinite scroll.
+- No N+1 queries: when displaying a list of items that each have related data, fetch all related data in a single query using joins or batch fetches rather than one query per item.
+- Parallel async: independent operations must run asynchronously and in parallel where possible -- use Promise.all instead of chaining unrelated async calls sequentially.
 - Performance: avoid unnecessary re-renders, don't do expensive work on every keystroke/render, keep the bundle lean.
 - Scope: generate the minimum viable complete app. Every core feature described below must actually work end to end, with no placeholder or "coming soon" sections -- but nothing beyond what was described. Keep this initial version focused and concise: a single well-structured file for static apps, or a minimal but complete set of files for React apps. The user can ask for additions afterward through the change-request flow.
 - If the app collects any user data -- emails, names, form submissions, or any other personally identifiable information -- include a simple privacy policy footer or modal that lists what data is collected and states it is not shared with third parties.

@@ -31,8 +31,16 @@ function MissingApiKey() {
 function CoachApp() {
   const { user, signOut } = useAuth();
   const { apiKey, loading: apiKeyLoading } = useApiKey();
-  const { conversations, createConversation, saveMessages, renameConversation, deleteConversation } =
-    useConversations(user?.id);
+  const {
+    conversations,
+    createConversation,
+    saveMessages,
+    renameConversation,
+    deleteConversation,
+    hasMore,
+    loadingMore,
+    loadMore,
+  } = useConversations(user?.id);
   const { profile: brandProfile } = useBrandProfile(user?.id);
 
   const [mode, setMode] = useState<"chat" | "builder">("chat");
@@ -85,6 +93,9 @@ function CoachApp() {
         }}
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
+        hasMore={hasMore}
+        loadingMore={loadingMore}
+        onLoadMore={loadMore}
       />
 
       <div className="flex min-w-0 flex-1 flex-col">

@@ -75,7 +75,7 @@ function PostModal({ post, onClose, onUpdate, onDelete, accent, pillarColor }) {
       }} onClick={e => e.stopPropagation()}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <h3 style={{ fontFamily: 'Georgia, serif', fontSize: 18, color: '#1C1A18', margin: 0, fontWeight: 400 }}>Edit Post</h3>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#C9BFA8' }}>×</button>
+          <button onClick={onClose} title="Close" aria-label="Close" style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#C9BFA8' }}>×</button>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
@@ -167,11 +167,11 @@ function CalendarView({ plan, accent, onPostClick, today }) {
     <div>
       {/* Month nav */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
-        <button onClick={prevMonth} style={navBtnStyle}>&#8249;</button>
+        <button onClick={prevMonth} title="Previous month" aria-label="Previous month" style={navBtnStyle}>&#8249;</button>
         <span style={{ fontFamily: 'Georgia, serif', fontSize: 18, color: '#1C1A18', minWidth: 160, textAlign: 'center' }}>
           {monthName} {year}
         </span>
-        <button onClick={nextMonth} style={navBtnStyle}>&#8250;</button>
+        <button onClick={nextMonth} title="Next month" aria-label="Next month" style={navBtnStyle}>&#8250;</button>
       </div>
 
       {/* Day headers */}
@@ -254,6 +254,7 @@ export default function ContentTab({ brand, showToast, onNavigateToStudio }) {
   const [loading, setLoading] = useState(false);
   const [planView, setPlanView] = useState(() => loadStorage(PLAN_VIEW_KEY, 'List'));
   const [selectedPost, setSelectedPost] = useState(null);
+  const [visiblePlanCount, setVisiblePlanCount] = useState(20);
 
   const today = new Date();
 
@@ -442,7 +443,7 @@ export default function ContentTab({ brand, showToast, onNavigateToStudio }) {
           {planView === 'List' && (
             <div>
               {plan.length === 0 && <div style={emptyStyle}>No posts planned yet.</div>}
-              {plan.map(p => (
+              {plan.slice(0, visiblePlanCount).map(p => (
                 <div key={p.id} style={{
                   background: '#FDFAF5', border: `1px solid ${p.flagged ? '#c4821a' : 'rgba(201,191,168,0.38)'}`,
                   borderRadius: 10, padding: '14px 18px', marginBottom: 8,
@@ -478,6 +479,14 @@ export default function ContentTab({ brand, showToast, onNavigateToStudio }) {
                   </div>
                 </div>
               ))}
+              {plan.length > visiblePlanCount && (
+                <button onClick={() => setVisiblePlanCount(v => v + 20)} style={{
+                  width: '100%', padding: '10px 0', background: 'transparent',
+                  border: '1px solid rgba(201,191,168,0.38)', borderRadius: 8,
+                  fontSize: 13, fontWeight: 600, color: '#1C1A18', cursor: 'pointer',
+                  fontFamily: 'DM Sans, sans-serif',
+                }}>Load more</button>
+              )}
             </div>
           )}
 

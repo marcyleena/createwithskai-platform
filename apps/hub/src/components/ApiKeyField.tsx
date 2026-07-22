@@ -27,7 +27,6 @@ export function ApiKeyField({
   const { credential, loading, save, remove } = useCredential(provider, credentialType);
   const [value, setValue] = useState("");
   const [editing, setEditing] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const hasKey = Boolean(credential);
@@ -35,23 +34,21 @@ export function ApiKeyField({
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!value.trim()) return;
-    setSaving(true);
     setError(null);
-    const { error: saveError } = await save({ [valueKey]: value.trim() });
-    setSaving(false);
-    if (saveError) {
-      setError(saveError);
-      return;
-    }
+    const submittedValue = value.trim();
     setValue("");
     setEditing(false);
+    const { error: saveError } = await save({ [valueKey]: submittedValue });
+    if (saveError) {
+      setError(saveError);
+      setValue(submittedValue);
+      setEditing(true);
+    }
   }
 
   async function handleRemove() {
-    setSaving(true);
-    await remove();
-    setSaving(false);
     setEditing(false);
+    await remove();
   }
 
   return (
@@ -82,9 +79,8 @@ export function ApiKeyField({
           </button>
           <button
             type="button"
-            className="text-sm font-medium text-espresso/50 underline underline-offset-4 disabled:opacity-50"
+            className="text-sm font-medium text-espresso/50 underline underline-offset-4"
             onClick={handleRemove}
-            disabled={saving}
           >
             Remove
           </button>
@@ -99,8 +95,8 @@ export function ApiKeyField({
             className="sm:flex-1"
           />
           <div className="flex gap-2">
-            <Button type="submit" variant="dark" disabled={saving || !value.trim()}>
-              {saving ? "Saving…" : "Save"}
+            <Button type="submit" variant="dark" disabled={!value.trim()}>
+              Save
             </Button>
             {hasKey && (
               <Button type="button" variant="dark" onClick={() => setEditing(false)}>

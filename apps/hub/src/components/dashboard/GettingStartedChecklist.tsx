@@ -1,9 +1,15 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useAuth } from "@createwithskai/auth";
 import { Button } from "@createwithskai/ui";
-import { useCredential } from "../../hooks/useCredential";
+import { useCredentials } from "../../hooks/useCredentials";
 import { useGithubConnected } from "../../hooks/useGithubConnected";
 import { CheckBadge } from "../CheckBadge";
+
+const CREDENTIAL_SPECS = [
+  { provider: "anthropic" },
+  { provider: "apify" },
+  { provider: "vercel", credentialType: "api_token" },
+];
 
 const DISMISS_KEY_PREFIX = "hub-getting-started-dismissed:";
 const FADE_DELAY_MS = 3000;
@@ -34,9 +40,7 @@ function ChecklistCard({ done, doneLabel, children }: { done: boolean; doneLabel
 // it's keyed off the signed-in user's id).
 export function GettingStartedChecklist() {
   const { user } = useAuth();
-  const anthropic = useCredential("anthropic");
-  const apify = useCredential("apify");
-  const vercel = useCredential("vercel", "api_token");
+  const { credentials, loading: credentialsLoading } = useCredentials(CREDENTIAL_SPECS);
   const { connected: githubConnected, loading: githubLoading, connect } = useGithubConnected();
   const [githubBusy, setGithubBusy] = useState(false);
   const [githubError, setGithubError] = useState<string | null>(null);
@@ -51,13 +55,13 @@ export function GettingStartedChecklist() {
     setDismissed(localStorage.getItem(dismissKey) === "1");
   }, [dismissKey]);
 
-  const loading = anthropic.loading || apify.loading || vercel.loading || githubLoading;
+  const loading = credentialsLoading || githubLoading;
 
   const steps = [
-    { done: Boolean(anthropic.credential) },
-    { done: Boolean(apify.credential) },
+    { done: Boolean(credentials.anthropic) },
+    { done: Boolean(credentials.apify) },
     { done: githubConnected },
-    { done: Boolean(vercel.credential) },
+    { done: Boolean(credentials.vercel) },
   ];
   const completedCount = steps.filter((s) => s.done).length;
   const allComplete = completedCount === steps.length;

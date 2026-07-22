@@ -25,7 +25,7 @@ export default function Settings({ brand, onSave, onClose }) {
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28 }}>
           <h2 style={{ fontFamily: 'Georgia, serif', fontSize: 22, color: '#1C1A18', margin: 0 }}>Settings</h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#C9BFA8' }}>x</button>
+          <button onClick={onClose} title="Close" aria-label="Close" style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#C9BFA8' }}>x</button>
         </div>
 
         {[

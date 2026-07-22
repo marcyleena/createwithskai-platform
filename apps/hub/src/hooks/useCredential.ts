@@ -33,6 +33,17 @@ export function useCredential(provider: string, credentialType = "api_key") {
   const save = useCallback(
     async (value: Record<string, unknown>) => {
       if (!user) return { error: "Not signed in" };
+      const previous = credential;
+      const now = new Date().toISOString();
+      setCredential({
+        id: previous?.id ?? "optimistic",
+        user_id: user.id,
+        provider,
+        credential_type: credentialType,
+        value,
+        created_at: previous?.created_at ?? now,
+        updated_at: now,
+      });
       const { data, error } = await supabase
         .from("user_credentials")
         .upsert(
@@ -41,17 +52,22 @@ export function useCredential(provider: string, credentialType = "api_key") {
         )
         .select()
         .single();
-      if (error) return { error: error.message };
+      if (error) {
+        setCredential(previous);
+        return { error: error.message };
+      }
       setCredential(data as UserCredential);
       return { error: null };
     },
-    [user, provider, credentialType]
+    [user, provider, credentialType, credential]
   );
 
   const remove = useCallback(async () => {
     if (!credential) return;
-    await supabase.from("user_credentials").delete().eq("id", credential.id);
+    const previous = credential;
     setCredential(null);
+    const { error } = await supabase.from("user_credentials").delete().eq("id", previous.id);
+    if (error) setCredential(previous);
   }, [credential]);
 
   return { credential, loading, save, remove, refresh };

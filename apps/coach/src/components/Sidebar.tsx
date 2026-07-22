@@ -12,6 +12,9 @@ interface SidebarProps {
   onOpenBuilder: () => void;
   isOpen: boolean;
   onClose: () => void;
+  hasMore?: boolean;
+  loadingMore?: boolean;
+  onLoadMore?: () => void;
 }
 
 export function Sidebar({
@@ -24,6 +27,9 @@ export function Sidebar({
   onOpenBuilder,
   isOpen,
   onClose,
+  hasMore,
+  loadingMore,
+  onLoadMore,
 }: SidebarProps) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draftTitle, setDraftTitle] = useState("");
@@ -114,6 +120,16 @@ export function Sidebar({
               )}
             </div>
           ))}
+          {hasMore && (
+            <button
+              type="button"
+              onClick={onLoadMore}
+              disabled={loadingMore}
+              className="w-full rounded-lg p-2 text-center text-sm font-medium text-espresso/60 hover:bg-cream disabled:opacity-50"
+            >
+              {loadingMore ? "Loading…" : "Load more"}
+            </button>
+          )}
         </div>
       </aside>
     </>

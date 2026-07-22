@@ -11,6 +11,9 @@ interface BuilderSidebarProps {
   onDelete: (id: string) => void;
   isOpen: boolean;
   onClose: () => void;
+  hasMore?: boolean;
+  loadingMore?: boolean;
+  onLoadMore?: () => void;
 }
 
 const STATUS_STYLES: Record<string, string> = {
@@ -28,6 +31,9 @@ export function BuilderSidebar({
   onDelete,
   isOpen,
   onClose,
+  hasMore,
+  loadingMore,
+  onLoadMore,
 }: BuilderSidebarProps) {
   return (
     <>
@@ -86,6 +92,16 @@ export function BuilderSidebar({
               </div>
             );
           })}
+          {hasMore && (
+            <button
+              type="button"
+              onClick={onLoadMore}
+              disabled={loadingMore}
+              className="w-full rounded-lg p-2 text-center text-sm font-medium text-espresso/60 hover:bg-white disabled:opacity-50"
+            >
+              {loadingMore ? "Loading…" : "Load more"}
+            </button>
+          )}
         </div>
       </aside>
     </>

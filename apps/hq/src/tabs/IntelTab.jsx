@@ -84,6 +84,7 @@ export default function IntelTab({ brand, showToast, onAlertsGenerated }) {
   const [addForm, setAddForm] = useState({ handle: '', niche: '', platform: 'instagram' });
   const [period, setPeriod] = useState('7d');
   const [loading, setLoading] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(20);
 
   const addCompetitor = () => {
     if (!addForm.handle) return;
@@ -232,7 +233,7 @@ export default function IntelTab({ brand, showToast, onAlertsGenerated }) {
             </div>
           )}
 
-          {competitors.map(c => (
+          {competitors.slice(0, visibleCount).map(c => (
             <div key={c.id} style={{
               background: '#FDFAF5', border: '1px solid rgba(201,191,168,0.38)',
               borderRadius: 10, padding: '12px 18px', marginBottom: 8,
@@ -246,6 +247,14 @@ export default function IntelTab({ brand, showToast, onAlertsGenerated }) {
               <button onClick={() => removeCompetitor(c.id)} style={deleteBtnStyle}>Remove</button>
             </div>
           ))}
+          {competitors.length > visibleCount && (
+            <button onClick={() => setVisibleCount(v => v + 20)} style={{
+              width: '100%', padding: '10px 0', background: 'transparent',
+              border: '1px solid rgba(201,191,168,0.38)', borderRadius: 8,
+              fontSize: 13, fontWeight: 600, color: '#1C1A18', cursor: 'pointer',
+              fontFamily: 'DM Sans, sans-serif',
+            }}>Load more</button>
+          )}
         </div>
       )}
 

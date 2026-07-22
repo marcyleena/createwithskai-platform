@@ -24,7 +24,6 @@ export function OnboardingApiKeyCard({
 }: OnboardingApiKeyCardProps) {
   const { credential, loading, save } = useCredential(provider, credentialType);
   const [value, setValue] = useState("");
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const hasKey = Boolean(credential);
@@ -32,15 +31,14 @@ export function OnboardingApiKeyCard({
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!value.trim()) return;
-    setSaving(true);
     setError(null);
-    const { error: saveError } = await save({ [valueKey]: value.trim() });
-    setSaving(false);
+    const submittedValue = value.trim();
+    setValue("");
+    const { error: saveError } = await save({ [valueKey]: submittedValue });
     if (saveError) {
       setError(saveError);
-      return;
+      setValue(submittedValue);
     }
-    setValue("");
   }
 
   return (
@@ -62,8 +60,8 @@ export function OnboardingApiKeyCard({
             placeholder={placeholder ?? "Paste your API key"}
             className="sm:flex-1"
           />
-          <Button type="submit" variant="dark" disabled={saving || !value.trim()}>
-            {saving ? "Saving…" : "Save"}
+          <Button type="submit" variant="dark" disabled={!value.trim()}>
+            Save
           </Button>
         </form>
       )}
