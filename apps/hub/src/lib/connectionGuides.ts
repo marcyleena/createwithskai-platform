@@ -24,7 +24,7 @@ export const CONNECTION_GUIDES: Record<string, ConnectionGuide> = {
       'Click Create Key, give it any name like "AI Business Launchpad", and copy the key',
       "Paste it in the field below",
     ],
-    note: "Anthropic charges per use with no monthly fee. Most users spend under $3 per month. A $5 top-up covers most users for several months.",
+    note: "Anthropic charges per use with no monthly fee. For Coach conversations most users spend under $3 per month. If you are actively using the App Builder to generate and iterate on apps, costs will be higher -- a single app build typically costs $0.15 to $0.50 and multiple builds in a month could add up to $10 to $20 or more depending on how much you build. We recommend starting with a $10 top-up.",
     primaryLink: { label: "Go to Anthropic Console", href: "https://console.anthropic.com/settings/keys" },
   },
   apify: {
