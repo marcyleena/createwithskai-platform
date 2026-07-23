@@ -1,16 +1,14 @@
-import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@createwithskai/auth";
 import { Button } from "@createwithskai/ui";
 import { SiteHeader } from "../components/SiteHeader";
 import { ToolNavCard } from "../components/ToolNavCard";
-import { ApiKeyField } from "../components/ApiKeyField";
-import { OAuthConnectionCard } from "../components/OAuthConnectionCard";
+import { ApiKeyGuideCard } from "../components/ApiKeyGuideCard";
+import { GithubGuideCard } from "../components/GithubGuideCard";
 import { GettingStartedChecklist } from "../components/dashboard/GettingStartedChecklist";
 import { NextStepPrompt } from "../components/dashboard/NextStepPrompt";
 import { DeleteAccountSection } from "../components/dashboard/DeleteAccountSection";
-import { CoachIcon, HqIcon, BuilderIcon, GitHubIcon } from "../components/icons";
-import { useGithubConnected } from "../hooks/useGithubConnected";
+import { CoachIcon, HqIcon, BuilderIcon } from "../components/icons";
 
 const TOOL_LINKS = [
   {
@@ -35,25 +33,6 @@ const TOOL_LINKS = [
 
 export function Dashboard() {
   const { user, signOut } = useAuth();
-  const { connected: githubConnected, loading: githubLoading, connect, disconnect } = useGithubConnected();
-  const [busyProvider, setBusyProvider] = useState<string | null>(null);
-  const [oauthError, setOauthError] = useState<string | null>(null);
-
-  async function handleConnect(provider: "github") {
-    setBusyProvider(provider);
-    setOauthError(null);
-    const { error } = await connect(provider);
-    if (error) setOauthError(error);
-    setBusyProvider(null);
-  }
-
-  async function handleDisconnect(provider: string) {
-    setBusyProvider(provider);
-    setOauthError(null);
-    const { error } = await disconnect(provider);
-    if (error) setOauthError(error);
-    setBusyProvider(null);
-  }
 
   const fullName = typeof user?.user_metadata?.full_name === "string" ? user.user_metadata.full_name : "";
   const firstName = fullName.split(" ")[0];
@@ -97,36 +76,13 @@ export function Dashboard() {
                 API keys
               </h3>
               <div className="space-y-4">
-                <ApiKeyField
-                  provider="anthropic"
-                  label="Anthropic"
-                  description="Powers Coach's conversations. Used only for your account."
-                />
-                <ApiKeyField
-                  provider="apify"
-                  label="Apify"
-                  description="Powers competitor and content research in Creator HQ."
-                />
-                <ApiKeyField
+                <ApiKeyGuideCard provider="anthropic" />
+                <ApiKeyGuideCard provider="apify" />
+                <ApiKeyGuideCard
                   provider="vercel"
-                  label="Vercel"
-                  description="Deploys what App Builder ships straight to your own account."
-                  placeholder="Vercel API token"
                   credentialType="api_token"
                   valueKey="token"
-                  helperText={
-                    <>
-                      Get your token at{" "}
-                      <a
-                        href="https://vercel.com/account/tokens"
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-accent-pink underline underline-offset-4"
-                      >
-                        vercel.com/account/tokens
-                      </a>
-                    </>
-                  }
+                  placeholder="Vercel API token"
                 />
               </div>
             </div>
@@ -136,17 +92,8 @@ export function Dashboard() {
                 Connections
               </h3>
               <div className="space-y-4">
-                <OAuthConnectionCard
-                  icon={<GitHubIcon className="h-5 w-5" />}
-                  name="GitHub"
-                  description="Needed so App Builder can push the code it generates for you."
-                  connected={!githubLoading && githubConnected}
-                  busy={busyProvider === "github"}
-                  onConnect={() => handleConnect("github")}
-                  onDisconnect={() => handleDisconnect("github")}
-                />
+                <GithubGuideCard />
               </div>
-              {oauthError && <p className="mt-3 text-sm text-red-600">{oauthError}</p>}
             </div>
           </div>
 

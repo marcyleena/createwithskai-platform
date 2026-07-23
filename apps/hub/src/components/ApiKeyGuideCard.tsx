@@ -1,29 +1,25 @@
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useState, type FormEvent } from "react";
 import { Button, Input } from "@createwithskai/ui";
 import { useCredential } from "../hooks/useCredential";
+import { CONNECTION_GUIDES } from "../lib/connectionGuides";
+import { GuideCard } from "./GuideCard";
 
-interface ApiKeyFieldProps {
+interface ApiKeyGuideCardProps {
   provider: string;
-  label: string;
-  description: string;
-  placeholder?: string;
   /** Defaults to "api_key" -- pass a different value for non-API-key credentials (e.g. Vercel's "api_token"). */
   credentialType?: string;
   /** Key inside the jsonb `value` column that holds the actual secret. Defaults to "api_key". */
   valueKey?: string;
-  /** Small note rendered below the input, e.g. a link to where to get the credential. */
-  helperText?: ReactNode;
+  placeholder?: string;
 }
 
-export function ApiKeyField({
+export function ApiKeyGuideCard({
   provider,
-  label,
-  description,
-  placeholder,
   credentialType = "api_key",
   valueKey = "api_key",
-  helperText,
-}: ApiKeyFieldProps) {
+  placeholder,
+}: ApiKeyGuideCardProps) {
+  const guide = CONNECTION_GUIDES[provider];
   const { credential, loading, save, remove } = useCredential(provider, credentialType);
   const [value, setValue] = useState("");
   const [editing, setEditing] = useState(false);
@@ -52,21 +48,7 @@ export function ApiKeyField({
   }
 
   return (
-    <div className="rounded-xl border border-taupe/40 bg-white/60 p-4">
-      <div className="mb-1 flex items-center justify-between">
-        <p className="font-medium text-espresso">{label}</p>
-        {!loading && (
-          <span
-            className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-              hasKey ? "bg-accent-pink/15 text-accent-pink" : "bg-taupe/30 text-espresso/60"
-            }`}
-          >
-            {hasKey ? "Saved" : "Not set"}
-          </span>
-        )}
-      </div>
-      <p className="mb-3 text-sm text-espresso/60">{description}</p>
-
+    <GuideCard done={hasKey} loading={loading} guide={guide}>
       {hasKey && !editing ? (
         <div className="flex flex-wrap items-center gap-3">
           <span className="font-mono text-sm text-espresso/50">•••••••••••••••• </span>
@@ -106,8 +88,7 @@ export function ApiKeyField({
           </div>
         </form>
       )}
-      {helperText && !(hasKey && !editing) && <p className="mt-2 text-xs text-espresso/50">{helperText}</p>}
       {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
-    </div>
+    </GuideCard>
   );
 }

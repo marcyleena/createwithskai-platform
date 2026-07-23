@@ -122,7 +122,7 @@ export function GettingStartedChecklist() {
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <ChecklistCard done={steps[0].done} doneLabel="Anthropic API key">
             <a
-              href="#profile-connections"
+              href="#connection-anthropic"
               className="text-sm font-medium text-espresso underline decoration-accent-pink underline-offset-4 hover:text-accent-pink"
             >
               Add your Anthropic API key
@@ -130,7 +130,7 @@ export function GettingStartedChecklist() {
           </ChecklistCard>
           <ChecklistCard done={steps[1].done} doneLabel="Apify API key">
             <a
-              href="#profile-connections"
+              href="#connection-apify"
               className="text-sm font-medium text-espresso underline decoration-accent-pink underline-offset-4 hover:text-accent-pink"
             >
               Add your Apify API key
@@ -151,7 +151,7 @@ export function GettingStartedChecklist() {
           </ChecklistCard>
           <ChecklistCard done={steps[3].done} doneLabel="Vercel">
             <a
-              href="#profile-connections"
+              href="#connection-vercel"
               className="text-sm font-medium text-espresso underline decoration-accent-pink underline-offset-4 hover:text-accent-pink"
             >
               Connect Vercel

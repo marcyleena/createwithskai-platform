@@ -1,6 +1,6 @@
 import { Button } from "@createwithskai/ui";
-import { OnboardingApiKeyCard } from "./OnboardingApiKeyCard";
-import { OnboardingGithubCard } from "./OnboardingGithubCard";
+import { ApiKeyGuideCard } from "../ApiKeyGuideCard";
+import { GithubGuideCard } from "../GithubGuideCard";
 
 export function StepConnect({ onNext }: { onNext: () => void }) {
   return (
@@ -15,64 +15,14 @@ export function StepConnect({ onNext }: { onNext: () => void }) {
         </p>
 
         <div className="space-y-4">
-          <OnboardingApiKeyCard
-            provider="anthropic"
-            label="Anthropic API key"
-            description={
-              <>
-                Powers all AI conversations in Coach and the App Builder. Get your key at{" "}
-                <a
-                  href="https://console.anthropic.com"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-accent-pink underline underline-offset-4"
-                >
-                  console.anthropic.com
-                </a>{" "}
-                -- it is pay as you go with no monthly fee.
-              </>
-            }
-          />
-          <OnboardingApiKeyCard
-            provider="apify"
-            label="Apify API key"
-            description={
-              <>
-                Powers the competitor intelligence and scraping features in Creator HQ. Get your key at{" "}
-                <a
-                  href="https://apify.com"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-accent-pink underline underline-offset-4"
-                >
-                  apify.com
-                </a>
-                .
-              </>
-            }
-          />
-          <OnboardingGithubCard />
-          <OnboardingApiKeyCard
+          <ApiKeyGuideCard provider="anthropic" />
+          <ApiKeyGuideCard provider="apify" />
+          <GithubGuideCard />
+          <ApiKeyGuideCard
             provider="vercel"
-            label="Vercel API token"
             credentialType="api_token"
             valueKey="token"
             placeholder="Vercel API token"
-            description={
-              <>
-                Deploys what the App Builder generates straight to your own Vercel account. Get your
-                token at{" "}
-                <a
-                  href="https://vercel.com/account/tokens"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-accent-pink underline underline-offset-4"
-                >
-                  vercel.com/account/tokens
-                </a>
-                .
-              </>
-            }
           />
         </div>
 
