@@ -1,4 +1,4 @@
-import type { IntakeAnswers, Stack } from "./types";
+import type { ConsiderationAnswer, IntakeAnswers, Stack } from "./types";
 import { findStyleTile } from "./styleTiles";
 import { resolveAppName } from "./naming";
 
@@ -76,6 +76,25 @@ const QUALITY_BAR = `Build this to production-ready quality -- something the use
 - If the app uses AI in any way -- calling an API, generating content, or making decisions -- include a visible disclosure that the feature is AI-powered. This is required for EU compliance as of August 2025.
 Generate both of these automatically whenever they apply -- do not wait for the user to ask for them.`;
 
+export function buildConsiderationsPrompt(intakeSummary: string): string {
+  return `Based on this app description, generate five to eight short consideration questions the builder should think about before generating their app. Focus on questions specific to this type of app that a non-technical user would not think to ask on their own. Each question should be answerable with Yes, No, or Not sure. Return only a JSON array of question strings, nothing else.
+
+App description: ${intakeSummary}`;
+}
+
+// Only Yes/No answers carry real instruction -- "Not sure" means "apply a
+// sensible default," which is already the model's fallback behavior, so
+// including it would just be noise. `considerations` is optional because
+// builds saved before this feature exist without the field.
+function formatConsiderationsBlock(considerations: Record<string, ConsiderationAnswer> | undefined): string {
+  if (!considerations) return "";
+  const lines = Object.entries(considerations)
+    .filter(([, answer]) => answer === "yes" || answer === "no")
+    .map(([question, answer]) => `${question}: ${answer === "yes" ? "Yes" : "No"}`);
+  if (lines.length === 0) return "";
+  return `USER CONSIDERATIONS:\n${lines.join("\n")}`;
+}
+
 function visualDirectionText(answers: IntakeAnswers): string {
   const tile = findStyleTile(answers.styleTile);
   const parts: string[] = [];
@@ -106,10 +125,12 @@ export function buildGenerationPrompt(stack: Stack, answers: IntakeAnswers): str
   const appName = resolveAppName(answers);
   const featureList = answers.features.trim() || "(none listed -- infer the minimal set of features the description above requires)";
 
+  const considerationsBlock = formatConsiderationsBlock(answers.considerations);
+
   return `You are generating a web app from a detailed intake.
 
 ${QUALITY_BAR}
-
+${considerationsBlock ? `\n${considerationsBlock}\n` : ""}
 App name: ${appName}
 What it does: ${answers.description}
 Who it's for: ${answers.audience}

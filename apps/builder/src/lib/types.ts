@@ -7,6 +7,8 @@ export interface GeneratedFile {
 
 export type StyleTileId = "clean-minimal" | "bold-vibrant" | "soft-feminine" | "dark-sleek";
 
+export type ConsiderationAnswer = "yes" | "no" | "not_sure";
+
 export interface IntakeAnswers {
   appName: string;
   description: string;
@@ -20,6 +22,8 @@ export interface IntakeAnswers {
   usesAI: boolean;
   aiDescription: string;
   specialRequirements: string;
+  /** Keyed by the exact question text (dynamic or fixed). */
+  considerations: Record<string, ConsiderationAnswer>;
 }
 
 export const EMPTY_ANSWERS: IntakeAnswers = {
@@ -35,6 +39,7 @@ export const EMPTY_ANSWERS: IntakeAnswers = {
   usesAI: false,
   aiDescription: "",
   specialRequirements: "",
+  considerations: {},
 };
 
 // Shape stored in app_builds.config (jsonb) -- see supabase/schema.sql.

@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { buildGenerationPrompt, buildChangeRequestPrompt } from "./systemPrompts";
+import { buildGenerationPrompt, buildChangeRequestPrompt, buildConsiderationsPrompt } from "./systemPrompts";
 import { parseGeneratedFiles, serializeFiles, mergeFiles } from "./fileParsing";
 import { selectRelevantFiles } from "./fileLookup";
 import type { GeneratedFile, IntakeAnswers, Stack } from "./types";
@@ -69,6 +69,36 @@ async function generateWithRetry(
     const retryText = await streamText(apiKey, prompt + TOO_SHORT_INSTRUCTION, onProgress);
     return parseGeneratedFiles(retryText);
   }
+}
+
+// Strict best-effort parse: any deviation from "a JSON array of strings"
+// (a stray code fence, a refusal, malformed JSON) just yields no dynamic
+// questions rather than throwing -- this call must never block generation.
+function parseQuestionsResponse(text: string): string[] {
+  const cleaned = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "");
+  try {
+    const parsed = JSON.parse(cleaned);
+    if (Array.isArray(parsed) && parsed.every((q) => typeof q === "string")) {
+      return parsed;
+    }
+  } catch {
+    // fall through
+  }
+  return [];
+}
+
+// Lightweight, non-streaming call used on the intake summary screen to
+// generate app-specific consideration questions -- small prompt, small
+// response, no need for the streaming/retry machinery generateApp uses.
+export async function generateConsiderationQuestions(apiKey: string, intakeSummary: string): Promise<string[]> {
+  const client = createClient(apiKey);
+  const response = await client.messages.create({
+    model: MODEL,
+    max_tokens: 600,
+    messages: [{ role: "user", content: buildConsiderationsPrompt(intakeSummary) }],
+  });
+  const textBlock = response.content.find((block) => block.type === "text");
+  return textBlock ? parseQuestionsResponse(textBlock.text) : [];
 }
 
 export async function generateApp(

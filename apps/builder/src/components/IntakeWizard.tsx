@@ -3,9 +3,13 @@ import { Button } from "@createwithskai/ui";
 import { STYLE_TILES, findStyleTile } from "../lib/styleTiles";
 import { deriveBuildName } from "../lib/naming";
 import { loadIntakeDraft, saveIntakeDraft, clearIntakeDraft } from "../lib/intakeDraft";
-import { EMPTY_ANSWERS, type IntakeAnswers, type StyleTileId } from "../lib/types";
+import { buildIntakeSummaryText } from "../lib/considerations";
+import { generateConsiderationQuestions } from "../lib/anthropic";
+import { EMPTY_ANSWERS, type ConsiderationAnswer, type IntakeAnswers, type StyleTileId } from "../lib/types";
+import { ConsiderationsChecklist } from "./ConsiderationsChecklist";
 
 interface IntakeWizardProps {
+  apiKey: string;
   onComplete: (answers: IntakeAnswers) => void;
 }
 
@@ -46,6 +50,8 @@ interface IntakeDraft {
   answers: IntakeAnswers;
   history: HistoryEntry[];
   basicsInput: string;
+  dynamicQuestions: string[] | null;
+  dynamicFetchedFor: string | null;
 }
 
 function getDraft(): IntakeDraft | null {
@@ -66,7 +72,7 @@ function ChatBubble({ role, children }: { role: "assistant" | "user"; children: 
   );
 }
 
-export function IntakeWizard({ onComplete }: IntakeWizardProps) {
+export function IntakeWizard({ apiKey, onComplete }: IntakeWizardProps) {
   const [answers, setAnswers] = useState<IntakeAnswers>(() => getDraft()?.answers ?? EMPTY_ANSWERS);
   const [step, setStep] = useState<Step>(() => getDraft()?.step ?? "appName");
   const [history, setHistory] = useState<HistoryEntry[]>(
@@ -74,15 +80,72 @@ export function IntakeWizard({ onComplete }: IntakeWizardProps) {
   );
   const [basicsInput, setBasicsInput] = useState(() => getDraft()?.basicsInput ?? "");
   const [editingSection, setEditingSection] = useState<Section | null>(() => getDraft()?.editingSection ?? null);
+  const [dynamicQuestions, setDynamicQuestions] = useState<string[] | null>(() => getDraft()?.dynamicQuestions ?? null);
+  const [dynamicFetchedFor, setDynamicFetchedFor] = useState<string | null>(
+    () => getDraft()?.dynamicFetchedFor ?? null
+  );
+  const [dynamicLoading, setDynamicLoading] = useState(false);
+  const [dynamicError, setDynamicError] = useState<string | null>(null);
 
   // Persist every change so switching tabs, refreshing, or coming back later
   // never loses in-progress answers -- cleared on Generate App / New Build.
   useEffect(() => {
-    saveIntakeDraft({ step, editingSection, answers, history, basicsInput } satisfies IntakeDraft);
-  }, [step, editingSection, answers, history, basicsInput]);
+    saveIntakeDraft({
+      step,
+      editingSection,
+      answers,
+      history,
+      basicsInput,
+      dynamicQuestions,
+      dynamicFetchedFor,
+    } satisfies IntakeDraft);
+  }, [step, editingSection, answers, history, basicsInput, dynamicQuestions, dynamicFetchedFor]);
+
+  // Fires once per distinct intake summary, only while the summary screen is
+  // actually showing -- toggling consideration answers doesn't change the
+  // summary text, so it never re-triggers this; editing description/features
+  // and coming back to the summary does.
+  useEffect(() => {
+    if (step !== "summary" || editingSection) return;
+    const summaryText = buildIntakeSummaryText(answers);
+    if (summaryText === dynamicFetchedFor) return;
+
+    let cancelled = false;
+    setDynamicLoading(true);
+    setDynamicError(null);
+    generateConsiderationQuestions(apiKey, summaryText)
+      .then((questions) => {
+        if (cancelled) return;
+        setDynamicQuestions(questions);
+        setDynamicFetchedFor(summaryText);
+        if (questions.length === 0) {
+          setDynamicError(
+            "Couldn't generate app-specific questions -- you can still continue with the checklist below."
+          );
+        }
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setDynamicFetchedFor(summaryText);
+        setDynamicError(
+          "Couldn't generate app-specific questions -- you can still continue with the checklist below."
+        );
+      })
+      .finally(() => {
+        if (!cancelled) setDynamicLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [step, editingSection, answers, apiKey, dynamicFetchedFor]);
 
   function patch(update: Partial<IntakeAnswers>) {
     setAnswers((prev) => ({ ...prev, ...update }));
+  }
+
+  function handleConsiderationAnswer(question: string, answer: ConsiderationAnswer) {
+    patch({ considerations: { ...answers.considerations, [question]: answer } });
   }
 
   function goToSummary() {
@@ -358,6 +421,14 @@ export function IntakeWizard({ onComplete }: IntakeWizardProps) {
             )}
           </SummarySection>
         )}
+
+        <ConsiderationsChecklist
+          considerations={answers.considerations}
+          onAnswer={handleConsiderationAnswer}
+          dynamicQuestions={dynamicQuestions}
+          dynamicLoading={dynamicLoading}
+          dynamicError={dynamicError}
+        />
 
         <Button
           variant="dark"

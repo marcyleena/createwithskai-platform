@@ -238,7 +238,7 @@ function BuilderApp() {
                   {generateError}
                 </p>
               )}
-              <IntakeWizard key={intakeKey} onComplete={handleIntakeComplete} />
+              <IntakeWizard key={intakeKey} apiKey={apiKey!} onComplete={handleIntakeComplete} />
             </div>
           )}
 
