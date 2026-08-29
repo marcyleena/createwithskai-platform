@@ -1,0 +1,217 @@
+{
+  "name": "Gmail Connection Health Check",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Gmail Connection Health Check\n\n**Setup after import:**\n1. Open the \"Test Gmail Connection\" node and select your existing Gmail credential (the same one used by the Launchpad workflow's Gmail trigger).\n2. Open the \"Send Alert Email\" node, find the Authorization header, and replace YOUR_RESEND_API_KEY_HERE in its value (Bearer YOUR_RESEND_API_KEY_HERE) with your real Resend API key.\n3. Activate the workflow.\n\n**Why Resend, not Gmail:** the alert fires specifically when the Gmail credential is broken, so sending that alert through Gmail itself would be unreliable right when it matters most. Resend is an independent channel -- this platform's existing transactional email provider -- so the alert still goes out even if Gmail is fully disconnected.\n\n**Why a static header instead of {{ $env.RESEND_API_KEY }}:** n8n environment variable expressions require an Enterprise plan. Pasting the key directly into this node keeps this workflow usable on any plan -- just be aware the key is stored in plain text inside this workflow, so treat exported copies of it as a secret.",
+        "height": 320,
+        "width": 380
+      },
+      "id": "6258541d-3054-455b-92c4-5f5a3994cd3e",
+      "name": "Setup Notes",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-320, -60]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 24
+            }
+          ]
+        }
+      },
+      "id": "d8faa0a4-1a04-4e4c-bdcc-e9193797b8e6",
+      "name": "Every 24 Hours",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-320, 300]
+    },
+    {
+      "parameters": {
+        "resource": "label",
+        "operation": "getAll",
+        "returnAll": false,
+        "limit": 1
+      },
+      "id": "00f3d097-462e-4581-a540-7e288c3619bf",
+      "name": "Test Gmail Connection",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [-60, 300],
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "REPLACE_WITH_YOUR_GMAIL_CREDENTIAL_ID",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "1fe9c138-1d0b-47d8-80a2-0450dc8b43a1",
+      "name": "Connection OK -- No Action",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [220, 180]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ String($json.error?.httpCode || $json.error?.code || '') }}",
+              "rightValue": "401",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "leftValue": "={{ ($json.error?.message || $json.error?.description || '').toLowerCase() }}",
+              "rightValue": "unauthorized",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "leftValue": "={{ ($json.error?.message || $json.error?.description || '').toLowerCase() }}",
+              "rightValue": "invalid_grant",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "leftValue": "={{ ($json.error?.message || $json.error?.description || '').toLowerCase() }}",
+              "rightValue": "invalid credentials",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "leftValue": "={{ ($json.error?.message || $json.error?.description || '').toLowerCase() }}",
+              "rightValue": "authentication",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "id": "a64e2118-87d7-44a6-9125-694ee1fc485d",
+      "name": "Is Authorization Error?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [220, 420]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.resend.com/emails",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_RESEND_API_KEY_HERE"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"from\": \"Skai Monroe <hello@createwithskai.cloud>\",\n  \"to\": [\"createwithskai@gmail.com\"],\n  \"subject\": \"Action needed: n8n Gmail connection expired\",\n  \"text\": \"Your n8n Gmail trigger has expired and will not detect new Stan Store purchases until reconnected. Go to your n8n dashboard and reconnect the Gmail credential in the Launchpad workflow.\"\n}",
+        "options": {}
+      },
+      "id": "1b14fd9c-e569-4fbd-907f-9804cab53a28",
+      "name": "Send Alert Email",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 340]
+    },
+    {
+      "parameters": {},
+      "id": "bfd15fe6-ab2d-40d6-9f99-bcd195312416",
+      "name": "Non-Auth Error -- No Action",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [480, 540]
+    }
+  ],
+  "connections": {
+    "Every 24 Hours": {
+      "main": [
+        [
+          {
+            "node": "Test Gmail Connection",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Test Gmail Connection": {
+      "main": [
+        [
+          {
+            "node": "Connection OK -- No Action",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Is Authorization Error?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Authorization Error?": {
+      "main": [
+        [
+          {
+            "node": "Send Alert Email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Non-Auth Error -- No Action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "id": "3cb709d3-b2d5-4fbe-b171-c7341fabf763",
+  "tags": []
+}
