@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useAuth } from "@createwithskai/auth";
 import type { BrandProfile, CoachConversation } from "@createwithskai/types";
 import { MessageBubble } from "./MessageBubble";
@@ -26,6 +26,20 @@ function deriveTitle(firstUserMessage: string): string {
   return clean.length > 60 ? `${clean.slice(0, 60)}...` : clean;
 }
 
+// How close to the bottom (in px) counts as "at the bottom" for auto-scroll purposes.
+const NEAR_BOTTOM_THRESHOLD = 100;
+
+// Scroll positions survive a ChatView remount (e.g. switching to the Product
+// Builder tab and back) by living outside the component instance, keyed by
+// conversation id so switching conversations doesn't leak one's scroll
+// position into another's.
+const NEW_CONVERSATION_SCROLL_KEY = "__new__";
+const savedScrollPositions = new Map<string, number>();
+
+function isNearBottom(el: HTMLElement): boolean {
+  return el.scrollHeight - el.scrollTop - el.clientHeight <= NEAR_BOTTOM_THRESHOLD;
+}
+
 export function ChatView({
   apiKey,
   conversation,
@@ -43,7 +57,15 @@ export function ChatView({
   const [sending, setSending] = useState(false);
   const [streamingText, setStreamingText] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  // Whether the user was at (or near) the bottom of the chat as of the last
+  // scroll event -- used to decide whether a new message should auto-scroll.
+  const isNearBottomRef = useRef(true);
+  // Mirrors conversationId for use inside scroll/visibility handlers, which
+  // are registered once and shouldn't need to be re-bound on every id change.
+  const conversationIdRef = useRef<string | null>(conversationId);
+  conversationIdRef.current = conversationId;
   // Tracks the conversation id this component's local state is already in
   // sync with. When sendMessage creates a conversation mid-send, it updates
   // this ref immediately (see below) so that when the `conversation` prop
@@ -60,8 +82,72 @@ export function ChatView({
     setConversationId(conversation?.id ?? null);
   }, [conversation?.id]);
 
+  // Restore the saved scroll position (if any) as soon as this instance
+  // mounts, before paint, so we don't flash at the top of the chat first.
+  useLayoutEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const key = conversationIdRef.current ?? NEW_CONVERSATION_SCROLL_KEY;
+    const saved = savedScrollPositions.get(key);
+    if (saved !== undefined) {
+      el.scrollTop = saved;
+      isNearBottomRef.current = isNearBottom(el);
+    }
+  }, []);
+
+  // Track scroll position so we know whether the user is actively reading
+  // earlier messages. Only remember a custom position when they've scrolled
+  // away from the bottom -- otherwise the default "stick to bottom" behavior
+  // is correct and there's nothing to restore later.
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    const el = containerRef.current;
+    if (!el) return;
+    function handleScroll() {
+      const near = isNearBottom(el as HTMLDivElement);
+      isNearBottomRef.current = near;
+      const key = conversationIdRef.current ?? NEW_CONVERSATION_SCROLL_KEY;
+      if (near) {
+        savedScrollPositions.delete(key);
+      } else {
+        savedScrollPositions.set(key, (el as HTMLDivElement).scrollTop);
+      }
+    }
+    el.addEventListener("scroll", handleScroll);
+    return () => el.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  // Save/restore around tab visibility changes (e.g. switching to another
+  // browser tab and back) using the Page Visibility API.
+  useEffect(() => {
+    function handleVisibilityChange() {
+      const el = containerRef.current;
+      if (!el) return;
+      const key = conversationIdRef.current ?? NEW_CONVERSATION_SCROLL_KEY;
+      if (document.visibilityState === "hidden") {
+        if (isNearBottom(el)) {
+          savedScrollPositions.delete(key);
+        } else {
+          savedScrollPositions.set(key, el.scrollTop);
+        }
+      } else if (document.visibilityState === "visible") {
+        const saved = savedScrollPositions.get(key);
+        if (saved !== undefined) {
+          el.scrollTop = saved;
+          isNearBottomRef.current = isNearBottom(el);
+        }
+      }
+    }
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, []);
+
+  // Auto-scroll to the newest message only if the user was already at (or
+  // near) the bottom before it arrived -- never yank them down from a
+  // position they scrolled up to on purpose.
+  useEffect(() => {
+    if (isNearBottomRef.current) {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
   }, [messages, streamingText]);
 
   async function handleAddFiles(files: FileList) {
@@ -139,7 +225,7 @@ export function ChatView({
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex-1 overflow-y-auto px-4 py-6 sm:px-8">
+      <div ref={containerRef} className="flex-1 overflow-y-auto px-4 py-6 sm:px-8">
         <div className="mx-auto flex max-w-3xl flex-col gap-4">
           {messages.length === 0 && !sending && (
             <div className="mb-2">
