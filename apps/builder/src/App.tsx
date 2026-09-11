@@ -14,6 +14,7 @@ import { useCredential } from "./hooks/useCredential";
 import { useBuilds } from "./hooks/useBuilds";
 import { generateApp, requestChange, friendlyErrorMessage, type GenerationProgress } from "./lib/anthropic";
 import { determineStack, STACK_LABELS } from "./lib/stackDetection";
+import { isLikelySparseGeneration } from "./lib/previewBuilder";
 import { deployApp, type DeployResult } from "./lib/deployClient";
 import { consumeGithubOAuthResult } from "./lib/githubOAuth";
 import { clearIntakeDraft } from "./lib/intakeDraft";
@@ -21,6 +22,22 @@ import { resolveAppName, slugifyRepoName } from "./lib/naming";
 import type { BuildConfig, GeneratedFile, IntakeAnswers, Stack } from "./lib/types";
 
 type Mode = "intake" | "generating" | "build";
+
+const INCOMPLETE_GENERATION_WARNING =
+  "Your app generated but may be incomplete -- some features may be missing. You can request missing features using the change request field below.";
+
+// Every React generation produces a fixed scaffold of files no matter how
+// simple the app is (see isLikelySparseGeneration in lib/previewBuilder.ts),
+// so a suspiciously low file count only means something went wrong for an
+// app that was actually asked to do a lot -- for a genuinely simple,
+// single-feature app, the same low count is normal and not worth flagging.
+function isComplexApp(answers: IntakeAnswers): boolean {
+  const featureCount = answers.features
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean).length;
+  return featureCount >= 3 || answers.needsAccounts || answers.needsPersistence || answers.usesAI;
+}
 
 // `error` distinguishes "we couldn't check whether you have a key" (a
 // Supabase credential-fetch failure) from "you genuinely don't have one yet"
@@ -67,6 +84,7 @@ function BuilderApp() {
   const [answers, setAnswers] = useState<IntakeAnswers | null>(null);
 
   const [generateError, setGenerateError] = useState<string | null>(null);
+  const [incompleteWarning, setIncompleteWarning] = useState<string | null>(null);
   const [generateProgress, setGenerateProgress] = useState<GenerationProgress>({ charsSoFar: 0, currentFile: null });
   const [changeRequesting, setChangeRequesting] = useState(false);
   const [changeProgress, setChangeProgress] = useState<GenerationProgress>({ charsSoFar: 0, currentFile: null });
@@ -106,6 +124,11 @@ function BuilderApp() {
       setBuildName(name);
       setFiles(generatedFiles);
       setDeployResult(null);
+      setIncompleteWarning(
+        isComplexApp(newAnswers) && isLikelySparseGeneration(generatedFiles, detectedStack)
+          ? INCOMPLETE_GENERATION_WARNING
+          : null
+      );
 
       const config: BuildConfig = { answers: newAnswers, stack: detectedStack, files: generatedFiles };
       const created = await createBuild(name, detectedStack, config);
@@ -179,6 +202,7 @@ function BuilderApp() {
     );
     setDeployError(null);
     setChangeError(null);
+    setIncompleteWarning(null);
     setMode("build");
     setSidebarOpen(false);
   }
@@ -194,6 +218,7 @@ function BuilderApp() {
     setGenerateError(null);
     setDeployError(null);
     setChangeError(null);
+    setIncompleteWarning(null);
     setMode("intake");
     setSidebarOpen(false);
   }
@@ -278,6 +303,10 @@ function BuilderApp() {
                   {STACK_LABELS[stack]}
                 </span>
               </div>
+
+              {incompleteWarning && (
+                <p className="rounded-lg bg-yellow-50 px-4 py-2 text-sm text-yellow-700">{incompleteWarning}</p>
+              )}
 
               <div className="h-[420px] sm:h-[520px]">
                 <LivePreview files={files} stack={stack} />

@@ -175,12 +175,9 @@ export function buildPreviewDocument(files: GeneratedFile[], stack: Stack): stri
     return appFile.content;
   }
 
-  // The generation prompt has Claude emit a minimal src/index.css up front
-  // (custom properties only) and, if the response runs long, come back at
-  // the end for the full component styling -- either by rewriting
-  // src/index.css (parseGeneratedFiles keeps only that later, complete
-  // version) or by adding a separate src/components.css. Concatenating
-  // every *.css file covers both without caring which one Claude picked.
+  // Normally just src/index.css, but concatenating every *.css file covers
+  // the (rare) case of Claude adding an extra stylesheet without needing to
+  // special-case it.
   const css = files
     .filter((f) => f.path.toLowerCase().endsWith(".css"))
     .map((f) => f.content)
@@ -205,4 +202,20 @@ export function buildPreviewDocument(files: GeneratedFile[], stack: Stack): stri
   </script>
 </body>
 </html>`;
+}
+
+// A React generation is expected to produce a fixed scaffold regardless of
+// how many features the app has -- App.jsx, main.jsx, index.html,
+// vite.config.js, package.json, index.css (plus SUPABASE_SETUP.md for the
+// supabase stack) -- so a count this low almost always means the response
+// got cut off partway through the file list, not that the app was simple.
+// A static-html app is always exactly one file by design, so it's never
+// "sparse" by this measure. This is a heuristic for setting expectations,
+// not a correctness check -- it never blocks anything, just flags when the
+// preview the user is looking at is probably missing files.
+const SPARSE_FILE_COUNT_THRESHOLD = 2;
+
+export function isLikelySparseGeneration(files: GeneratedFile[], stack: Stack): boolean {
+  if (stack === "static-html") return false;
+  return files.length <= SPARSE_FILE_COUNT_THRESHOLD;
 }

@@ -105,6 +105,15 @@ const QUALITY_BAR = `Build this to production-ready quality -- something the use
 - If the app uses AI in any way -- calling an API, generating content, or making decisions -- include a visible disclosure that the feature is AI-powered. This is required for EU compliance as of August 2025.
 Generate both of these automatically whenever they apply -- do not wait for the user to ask for them.`;
 
+// Applies to fresh generation the same principle SURGICAL_EDIT_RULE already
+// applies to change requests: for a complex app, running out of response
+// budget mid-feature is worse than never starting that feature at all -- a
+// half-written component can leave the whole app broken (unclosed JSX,
+// missing state a later section depends on), where an omitted one just
+// leaves a smaller, fully working app the user can extend via a change
+// request.
+const COMPLETENESS_OVER_SCOPE_RULE = `If you are running low on tokens, prioritize completing a smaller set of features fully over attempting all features incompletely. It is better to generate a complete working app with three features than an incomplete shell with seven. Never leave a component half-written. If you cannot complete a feature, omit it entirely and note it in a comment at the top of App.jsx as TODO.`;
+
 export function buildConsiderationsPrompt(intakeSummary: string): string {
   return `You are helping someone build a web app. Based on the app description below, generate five to eight short consideration questions the builder should think about before generating their app.
 STRICT RULES -- violating any of these means the question is invalid and must not be included:
@@ -186,6 +195,7 @@ export function buildGenerationPrompt(stack: Stack, answers: IntakeAnswers): str
   return `You are generating a web app from a detailed intake.
 
 ${QUALITY_BAR}
+${COMPLETENESS_OVER_SCOPE_RULE}
 ${considerationsBlock ? `\n${considerationsBlock}\n` : ""}
 App name: ${appName}
 What it does: ${answers.description}
