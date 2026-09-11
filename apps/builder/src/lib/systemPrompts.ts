@@ -18,8 +18,19 @@ Repeat that block for every file, one after another.`;
 const REACT_FILE_RULES = `Rules for src/App.jsx specifically, because it also has to run standalone in a live preview:
 - Export the component as a named function: function App() { ... } and put "export default App;" alone on the last line.
 - Only import from "react" (e.g. import { useState, useEffect } from "react";). Do not import any other package inside App.jsx.
-- Do not import CSS files inside App.jsx; styling lives in src/index.css and is loaded separately.
+- Do not import CSS files inside App.jsx; component styling still lives in src/index.css and is loaded separately.
 - The whole app must live in this one component file -- no other component files, no code-splitting.`;
+
+// Making src/App.jsx generate first (see entryFirstRule below) guarantees the
+// entry point exists even if the response is cut off, but src/index.css --
+// where the color palette normally lives -- could still be the very thing
+// that gets cut off, leaving the entry point unstyled. Defining the palette
+// redundantly inside App.jsx itself means it's never dependent on a separate
+// file finishing at all: it's part of the one file that's always complete.
+const INLINE_COLOR_VARIABLES_RULE = `Define the color palette as CSS custom properties directly inside src/App.jsx, in addition to using them in src/index.css -- do not rely on src/index.css alone for this. Do it one of these two ways:
+- Render a <style> element as the very first child of the component's returned JSX, e.g. <style>{\`:root { --color-primary: #...; --color-secondary: #...; }\`}</style>, listing every custom property from the color palette; or
+- In a useEffect that runs once on mount, create a <style> element with the same :root rule and append it to document.head.
+Either way, every custom property must be defined before anything else renders, so the palette exists the instant the app appears -- never dependent on src/index.css loading, finishing, or even existing. src/index.css should still reference these same variables with var(--color-primary) etc. for the app's actual component styling.`;
 
 // Static-html apps embed their <style> tag inline rather than shipping a
 // separate CSS file, so the "CSS file first" ordering below doesn't apply --
@@ -35,56 +46,43 @@ Produce exactly one file, named exactly "index.html", and make it the first and 
 ${FILE_FORMAT}`;
   }
 
-  // The previous version of this rule ("write a minimal index.css, then come
-  // back and rewrite it in full at the end") still let Claude write an
-  // oversized "minimal" file -- an expansive design-system-style token set
-  // plus a verbose reset can alone run long enough to exhaust the response
-  // before src/App.jsx, the entry point the preview actually depends on,
-  // ever gets written. This version puts a hard, checkable cap (8 color
-  // variables, 1 font variable, 1 reset line, 20 lines total) on that first
-  // pass instead of trusting "minimal" to be interpreted narrowly, and drops
-  // the "or rewrite index.css" fork entirely -- any further styling can only
-  // go in a new src/components.css file, so there's never a second, longer
-  // src/index.css block that could itself run over budget.
-  const styleFirstRule = `Output files in this EXACT order with NO exceptions:
-
-FIRST -- src/index.css. This file must contain ONLY these things and nothing else: CSS custom properties on :root for the color palette (maximum 8 variables), one font-family variable, and a single line box-sizing reset. No spacing scales. No shadow variables. No breakpoints. No dark mode. No component styles. No comments. Maximum 20 lines total. If you write more than 20 lines in this file you are violating this instruction.
-
-SECOND -- src/App.jsx. This is the main entry point and MUST always be generated. It is more important than any CSS file.
-
-THIRD -- all other component files in any order.
-
-FOURTH -- if additional styles are needed beyond the root variables, add a src/components.css file as the LAST file in your response.
-
-If you are running low on tokens, prioritize completing src/App.jsx and the component files over adding more CSS. A working unstyled app is better than a styled app with no entry point.`;
+  // A separate CSS file output first (or first-but-capped) both turned out
+  // unreliable in practice: Claude kept writing an oversized "minimal" file
+  // regardless of how strict the cap was worded, exhausting the response
+  // before src/App.jsx -- the file the preview actually depends on -- ever
+  // got written. Reverting to App.jsx first guarantees the entry point
+  // itself always generates; INLINE_COLOR_VARIABLES_RULE above solves the
+  // original styling problem a different way, by putting the palette inside
+  // that same always-generated file instead of gating it on a separate one.
+  const entryFirstRule = `Output "src/App.jsx" FIRST, before any other file -- it is the app's entry point and the live preview depends on it. Producing it first guarantees it exists even if your response gets cut off before you finish the remaining files.`;
 
   if (stack === "react-localstorage") {
     return `Generate a small React app (Vite + React) that uses plain useState/useEffect and the browser's localStorage API to persist data between sessions.
-${styleFirstRule}
+${entryFirstRule}
+${INLINE_COLOR_VARIABLES_RULE}
 Produce exactly these files, in this order:
-- src/index.css -- FIRST, capped at 20 lines: only root CSS custom properties for the color palette (max 8), one font-family variable, and a single box-sizing reset line
-- src/App.jsx -- SECOND, the entire app -- always generated, even at the expense of CSS
+- src/App.jsx (the entire app -- FIRST)
 - src/main.jsx (mounts <App /> from src/App.jsx into #root)
 - index.html (loads /src/main.jsx as a module script)
 - vite.config.js
 - package.json (vite, react, react-dom as dependencies)
-- src/components.css -- LAST, only if more styling is needed beyond the root variables
+- src/index.css (component styling, referencing the same custom properties defined in App.jsx -- LAST)
 ${REACT_FILE_RULES}
 ${FILE_FORMAT}`;
   }
 
   return `Generate a small React app (Vite + React) that needs user accounts and/or a shared database via Supabase.
 A Supabase client is already created and available as the global "window.supabase" -- call it directly from App.jsx (e.g. window.supabase.auth.signInWithPassword({ email, password }), window.supabase.from("table_name").select("*")). Do not import or create a Supabase client inside App.jsx.
-${styleFirstRule}
+${entryFirstRule}
+${INLINE_COLOR_VARIABLES_RULE}
 Produce exactly these files, in this order:
-- src/index.css -- FIRST, capped at 20 lines: only root CSS custom properties for the color palette (max 8), one font-family variable, and a single box-sizing reset line
-- src/App.jsx -- SECOND, the entire app, using window.supabase for every backend call -- always generated, even at the expense of CSS
+- src/App.jsx (the entire app, using window.supabase for every backend call -- FIRST)
 - src/main.jsx (creates the real Supabase client from import.meta.env.VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY, assigns it to window.supabase, then mounts <App />)
 - index.html
 - vite.config.js
 - package.json (vite, react, react-dom, @supabase/supabase-js as dependencies)
 - SUPABASE_SETUP.md (plain-language list of the tables/columns this app expects the user to create in their own Supabase project, since no backend is provisioned automatically)
-- src/components.css -- LAST, only if more styling is needed beyond the root variables
+- src/index.css (component styling, referencing the same custom properties defined in App.jsx -- LAST)
 ${REACT_FILE_RULES}
 ${FILE_FORMAT}`;
 }
@@ -169,7 +167,7 @@ function colorPaletteText(answers: IntakeAnswers): string {
   return "No specific colors were given -- invent a cohesive color palette that matches the visual direction above, and apply it consistently across every screen and component.";
 }
 
-const CSS_CUSTOM_PROPERTIES_RULE = `The color palette above MUST be defined as CSS custom properties at the root level (:root in src/index.css, or in the <style> block for a static HTML app) -- e.g. --color-primary, --color-secondary, --color-background, --color-text -- and every component's styling must reference them with var(--color-primary) etc. Never hardcode hex/rgb colors that bypass the palette.`;
+const CSS_CUSTOM_PROPERTIES_RULE = `The color palette above MUST be defined as CSS custom properties on :root -- e.g. --color-primary, --color-secondary, --color-background, --color-text -- and every component's styling must reference them with var(--color-primary) etc. Never hardcode hex/rgb colors that bypass the palette. (See the file-order rules below for exactly where these need to be defined.)`;
 
 function aiFeatureText(answers: IntakeAnswers): string {
   if (!answers.usesAI) return "";
