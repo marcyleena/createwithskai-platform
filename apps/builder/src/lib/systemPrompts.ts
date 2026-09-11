@@ -35,28 +35,40 @@ Produce exactly one file, named exactly "index.html", and make it the first and 
 ${FILE_FORMAT}`;
   }
 
-  // A full src/index.css (palette + typography + every component's styles)
-  // output first was itself the bug this replaced: a complex app's CSS alone
-  // can run long enough to exhaust the response before src/App.jsx -- the
-  // entry point the preview actually depends on -- ever gets written, so
-  // generation failed with no App.jsx at all despite CSS being fine on its
-  // own. Splitting index.css into a minimal pass (just the custom properties
-  // every component reads from) up front, App.jsx and the rest of the
-  // project right after, and the full component styling only at the very
-  // end means a cutoff there drops component styles, not the entry point.
-  const styleFirstRule = `Output files in this exact order: first, "src/index.css" containing ONLY the CSS custom properties, root variables, and a base reset -- no component styles yet; second, "src/App.jsx" as the main entry point; third, the rest of the project's files (see the list below); fourth, go back and add the full component styling -- either by rewriting "src/index.css" completely (every style the app needs, still built on the custom properties from step one) or by adding a separate "src/components.css" file for it. This order guarantees the color palette is defined and the entry point exists even if the response is cut off before that final, fuller styling pass finishes.`;
+  // The previous version of this rule ("write a minimal index.css, then come
+  // back and rewrite it in full at the end") still let Claude write an
+  // oversized "minimal" file -- an expansive design-system-style token set
+  // plus a verbose reset can alone run long enough to exhaust the response
+  // before src/App.jsx, the entry point the preview actually depends on,
+  // ever gets written. This version puts a hard, checkable cap (8 color
+  // variables, 1 font variable, 1 reset line, 20 lines total) on that first
+  // pass instead of trusting "minimal" to be interpreted narrowly, and drops
+  // the "or rewrite index.css" fork entirely -- any further styling can only
+  // go in a new src/components.css file, so there's never a second, longer
+  // src/index.css block that could itself run over budget.
+  const styleFirstRule = `Output files in this EXACT order with NO exceptions:
+
+FIRST -- src/index.css. This file must contain ONLY these things and nothing else: CSS custom properties on :root for the color palette (maximum 8 variables), one font-family variable, and a single line box-sizing reset. No spacing scales. No shadow variables. No breakpoints. No dark mode. No component styles. No comments. Maximum 20 lines total. If you write more than 20 lines in this file you are violating this instruction.
+
+SECOND -- src/App.jsx. This is the main entry point and MUST always be generated. It is more important than any CSS file.
+
+THIRD -- all other component files in any order.
+
+FOURTH -- if additional styles are needed beyond the root variables, add a src/components.css file as the LAST file in your response.
+
+If you are running low on tokens, prioritize completing src/App.jsx and the component files over adding more CSS. A working unstyled app is better than a styled app with no entry point.`;
 
   if (stack === "react-localstorage") {
     return `Generate a small React app (Vite + React) that uses plain useState/useEffect and the browser's localStorage API to persist data between sessions.
 ${styleFirstRule}
 Produce exactly these files, in this order:
-- src/index.css -- FIRST, but only custom properties/root variables and a base reset at this point
-- src/App.jsx -- SECOND, the entire app
+- src/index.css -- FIRST, capped at 20 lines: only root CSS custom properties for the color palette (max 8), one font-family variable, and a single box-sizing reset line
+- src/App.jsx -- SECOND, the entire app -- always generated, even at the expense of CSS
 - src/main.jsx (mounts <App /> from src/App.jsx into #root)
 - index.html (loads /src/main.jsx as a module script)
 - vite.config.js
 - package.json (vite, react, react-dom as dependencies)
-- src/index.css again, now rewritten with the full component styling (or src/components.css as a separate file) -- LAST, after everything else
+- src/components.css -- LAST, only if more styling is needed beyond the root variables
 ${REACT_FILE_RULES}
 ${FILE_FORMAT}`;
   }
@@ -65,14 +77,14 @@ ${FILE_FORMAT}`;
 A Supabase client is already created and available as the global "window.supabase" -- call it directly from App.jsx (e.g. window.supabase.auth.signInWithPassword({ email, password }), window.supabase.from("table_name").select("*")). Do not import or create a Supabase client inside App.jsx.
 ${styleFirstRule}
 Produce exactly these files, in this order:
-- src/index.css -- FIRST, but only custom properties/root variables and a base reset at this point
-- src/App.jsx -- SECOND, the entire app, using window.supabase for every backend call
+- src/index.css -- FIRST, capped at 20 lines: only root CSS custom properties for the color palette (max 8), one font-family variable, and a single box-sizing reset line
+- src/App.jsx -- SECOND, the entire app, using window.supabase for every backend call -- always generated, even at the expense of CSS
 - src/main.jsx (creates the real Supabase client from import.meta.env.VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY, assigns it to window.supabase, then mounts <App />)
 - index.html
 - vite.config.js
 - package.json (vite, react, react-dom, @supabase/supabase-js as dependencies)
 - SUPABASE_SETUP.md (plain-language list of the tables/columns this app expects the user to create in their own Supabase project, since no backend is provisioned automatically)
-- src/index.css again, now rewritten with the full component styling (or src/components.css as a separate file) -- LAST, after everything else
+- src/components.css -- LAST, only if more styling is needed beyond the root variables
 ${REACT_FILE_RULES}
 ${FILE_FORMAT}`;
 }

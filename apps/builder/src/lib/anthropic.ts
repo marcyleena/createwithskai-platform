@@ -9,8 +9,10 @@ export const MODEL = "claude-sonnet-4-6";
 
 // Generous headroom for a full multi-file app -- combined with the
 // conciseness constraint in the generation prompt, this should comfortably
-// cover a focused first version without truncating mid-file.
-const MAX_TOKENS = 16000;
+// cover a focused first version without truncating mid-file. Raised from
+// 16000 to give the component files more room to complete after the
+// (now tightly capped) initial CSS pass in systemPrompts.ts.
+const MAX_TOKENS = 20000;
 
 const TOO_SHORT_INSTRUCTION =
   "\n\nYour previous attempt got cut off before it finished -- it was too long. This time, keep the app significantly shorter and simpler (fewer files, less code per file) while still being fully functional and complete.";
