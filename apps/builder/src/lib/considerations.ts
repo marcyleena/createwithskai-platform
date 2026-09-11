@@ -125,6 +125,52 @@ export function findFixedQuestion(text: string): ConsiderationQuestion | undefin
   return ALL_FIXED_QUESTIONS.find((q) => q.text === text);
 }
 
+// Backstop for buildConsiderationsPrompt (systemPrompts.ts): Claude sometimes
+// ignores the "no either/or" rule anyway, most often as "...or only to X" /
+// "...or also Y". "or not" and "not sure" aren't real second options -- they're
+// how a yes/no question restates itself, or a valid answer state -- so they
+// don't trigger this.
+const OR_NOT_A_CHOICE = /^(not sure|not)\b/i;
+
+function isEitherOrQuestion(question: string): boolean {
+  const match = question.match(/\bor\b\s*([\s\S]*)$/i);
+  if (!match) return false;
+  return !OR_NOT_A_CHOICE.test(match[1].trim());
+}
+
+// Best-effort repair rather than an outright discard: keeping only the
+// clause before the first "or" turns "should X be A or B?" into "should X be
+// A?" -- a real yes/no question that still covers the same underlying
+// consideration, matching the rephrasing the generation prompt itself asks
+// Claude to do. Returns null when too little is left to form a sensible
+// question, so the caller can drop it instead.
+const MIN_SIMPLIFIED_WORDS = 3;
+
+function simplifyEitherOrQuestion(question: string): string | null {
+  const orIndex = question.search(/\bor\b/i);
+  if (orIndex === -1) return null;
+  const clause = question.slice(0, orIndex).trim().replace(/[,;:.\s]+$/, "");
+  if (clause.split(/\s+/).filter(Boolean).length < MIN_SIMPLIFIED_WORDS) return null;
+  return `${clause}?`;
+}
+
+// Runs on every dynamic question before it's shown to the user, catching any
+// either/or question Claude generates despite buildConsiderationsPrompt's
+// rules against it -- simplified to a yes/no version where salvageable,
+// otherwise dropped (shown as one fewer question rather than an invalid one).
+export function sanitizeDynamicQuestions(questions: string[]): string[] {
+  const sanitized: string[] = [];
+  for (const question of questions) {
+    if (!isEitherOrQuestion(question)) {
+      sanitized.push(question);
+      continue;
+    }
+    const simplified = simplifyEitherOrQuestion(question);
+    if (simplified) sanitized.push(simplified);
+  }
+  return sanitized;
+}
+
 // The context sent to Claude to generate app-specific consideration
 // questions -- deliberately narrower than the full generation prompt (no
 // style/color info), since only the functional shape of the app matters here.

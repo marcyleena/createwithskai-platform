@@ -90,17 +90,22 @@ const QUALITY_BAR = `Build this to production-ready quality -- something the use
 Generate both of these automatically whenever they apply -- do not wait for the user to ask for them.`;
 
 export function buildConsiderationsPrompt(intakeSummary: string): string {
-  return `Based on this app description, generate consideration questions the builder should think about before generating their app. These are specific to this type of app -- things a non-technical user would not think to ask on their own.
+  return `You are helping someone build a web app. Based on the app description below, generate five to eight short consideration questions the builder should think about before generating their app.
+STRICT RULES -- violating any of these means the question is invalid and must not be included:
 
-Follow these rules exactly:
-1. Every question must be answerable with a simple Yes or No -- or Yes, No, Not sure if uncertainty is genuinely valid. Never generate a question that requires choosing between more than two named options.
-2. Never generate a compound question that asks two things at once. If two things need to be asked, make them two separate questions.
-3. Never generate a vague or technical question a non-technical user wouldn't understand. Use plain, everyday language.
-4. If a consideration would naturally require choosing between named options -- for example a question about frequency or format -- rephrase it as a Yes/No question instead, and let the generation prompt work out the specifics from that Yes. For example, instead of "How often should the app send notifications -- daily, weekly, or monthly?" ask "Should the app send users notifications?"
-5. Generate five to eight questions total, maximum. Prioritize the most impactful considerations specific to this app -- not generic questions that would apply to any app.
+1. Every question MUST be answerable with YES or NO only. No either/or questions. No choosing between options. No multiple choice.
+2. NEVER ask 'should X or Y' -- this is an either/or question and is forbidden. Instead ask 'should X?' as a standalone yes/no question.
+3. NEVER ask compound questions that contain 'or' as a choice between two approaches. The word 'or' is a signal the question is invalid.
+4. NEVER ask about frequency, format, or method choices -- these cannot be yes/no.
+5. Questions must be specific to this app type -- not generic questions that apply to any app.
+6. Use plain non-technical language a non-developer would understand immediately.
+7. Keep each question under fifteen words.
 
-Return only a JSON array of question strings, nothing else.
-
+VALID example: 'Should users be able to see ratings without creating an account?'
+INVALID example: 'Should ratings be visible to anyone or only to logged in users?' -- this contains 'or' as a choice and is forbidden.
+VALID example: 'Should the AI tips use information from outside the app?'
+INVALID example: 'Should AI tips be based only on in-app data or also pull from outside sources?' -- either/or, forbidden.
+Return ONLY a valid JSON array of question strings. No other text. No markdown. No explanation.
 App description: ${intakeSummary}`;
 }
 

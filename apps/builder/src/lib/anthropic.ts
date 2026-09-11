@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { buildGenerationPrompt, buildChangeRequestPrompt, buildConsiderationsPrompt } from "./systemPrompts";
 import { parseGeneratedFiles, serializeFiles, mergeFiles } from "./fileParsing";
 import { selectRelevantFiles } from "./fileLookup";
+import { sanitizeDynamicQuestions } from "./considerations";
 import type { GeneratedFile, IntakeAnswers, Stack } from "./types";
 
 export const MODEL = "claude-sonnet-4-6";
@@ -148,7 +149,8 @@ export async function generateConsiderationQuestions(apiKey: string, intakeSumma
     messages: [{ role: "user", content: buildConsiderationsPrompt(intakeSummary) }],
   });
   const textBlock = response.content.find((block) => block.type === "text");
-  return textBlock ? parseQuestionsResponse(textBlock.text) : [];
+  const questions = textBlock ? parseQuestionsResponse(textBlock.text) : [];
+  return sanitizeDynamicQuestions(questions);
 }
 
 export async function generateApp(
