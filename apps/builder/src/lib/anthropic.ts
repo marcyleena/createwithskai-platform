@@ -7,14 +7,13 @@ import type { GeneratedFile, IntakeAnswers, Stack } from "./types";
 
 export const MODEL = "claude-sonnet-4-6";
 
-// Generous headroom for a full multi-file app -- combined with the
-// conciseness constraint in the generation prompt, this should comfortably
-// cover a focused first version without truncating mid-file. Raised from
-// 20000 to give complex, multi-feature apps more room to complete every
-// feature they attempt (see COMPLETENESS_OVER_SCOPE_RULE in
-// systemPrompts.ts, which asks Claude to scale back scope rather than run
-// over this budget).
-const MAX_TOKENS = 24000;
+// The maximum output tokens Claude Sonnet supports -- used for both fresh
+// generation and change requests (both go through streamText below) so even
+// the most complex, multi-feature app has room to finish completely rather
+// than being cut off (see COMPLETENESS_OVER_SCOPE_RULE in systemPrompts.ts,
+// which still asks Claude to scale back scope if it's genuinely going to
+// run over even this budget).
+const MAX_TOKENS = 64000;
 
 const TOO_SHORT_INSTRUCTION =
   "\n\nYour previous attempt got cut off before it finished -- it was too long. This time, keep the app significantly shorter and simpler (fewer files, less code per file) while still being fully functional and complete.";
