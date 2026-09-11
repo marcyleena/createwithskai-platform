@@ -22,18 +22,29 @@ import type { BuildConfig, GeneratedFile, IntakeAnswers, Stack } from "./lib/typ
 
 type Mode = "intake" | "generating" | "build";
 
-function MissingApiKey() {
+// `error` distinguishes "we couldn't check whether you have a key" (a
+// Supabase credential-fetch failure) from "you genuinely don't have one yet"
+// -- the former is a transient problem worth retrying, not a setup step.
+function MissingApiKey({ error }: { error?: string | null }) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-cream px-6">
       <Card className="max-w-md text-center">
-        <h1 className="mb-2 text-xl font-semibold text-espresso">Add your Anthropic API key</h1>
+        <h1 className="mb-2 text-xl font-semibold text-espresso">
+          {error ? "Couldn't load your account" : "Add your Anthropic API key"}
+        </h1>
         <p className="mb-5 text-sm text-espresso/70">
-          The App Builder needs your own Anthropic API key to generate code. Add it once from your
-          dashboard and every Launchpad tool -- including this one -- picks it up automatically.
+          {error ??
+            "The App Builder needs your own Anthropic API key to generate code. Add it once from your dashboard and every Launchpad tool -- including this one -- picks it up automatically."}
         </p>
-        <a href={getHubOrigin()}>
-          <Button variant="dark">Go to your dashboard</Button>
-        </a>
+        {error ? (
+          <Button variant="dark" onClick={() => window.location.reload()}>
+            Try again
+          </Button>
+        ) : (
+          <a href={getHubOrigin()}>
+            <Button variant="dark">Go to your dashboard</Button>
+          </a>
+        )}
       </Card>
     </div>
   );
@@ -41,7 +52,7 @@ function MissingApiKey() {
 
 function BuilderApp() {
   const { user, signOut } = useAuth();
-  const { apiKey, loading: apiKeyLoading } = useApiKey();
+  const { apiKey, loading: apiKeyLoading, error: apiKeyError } = useApiKey();
   const { builds, createBuild, updateBuild, deleteBuild, hasMore, loadingMore, loadMore } = useBuilds(user?.id);
   const github = useCredential({ provider: "github", credentialType: "oauth_token", valueKey: "access_token" });
   const vercel = useCredential({ provider: "vercel", credentialType: "api_token", valueKey: "token" });
@@ -78,6 +89,7 @@ function BuilderApp() {
   }, []);
 
   if (apiKeyLoading) return null;
+  if (apiKeyError) return <MissingApiKey error={apiKeyError} />;
   if (!apiKey) return <MissingApiKey />;
 
   async function handleIntakeComplete(newAnswers: IntakeAnswers) {

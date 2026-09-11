@@ -74,8 +74,26 @@ export function friendlyErrorMessage(err: unknown): string {
   if (err instanceof Anthropic.RateLimitError) {
     return "Anthropic is rate-limiting this API key right now -- give it a moment and try again.";
   }
+  // Must come before the APIConnectionError check -- APIConnectionTimeoutError
+  // extends it, and a timeout deserves its own message ("try a simpler app")
+  // rather than the generic connectivity one below.
+  if (err instanceof Anthropic.APIConnectionTimeoutError) {
+    return "The request to Anthropic timed out -- this can happen on a complex app. Try again, or describe a simpler app.";
+  }
+  // Thrown when the request never got a response at all (DNS failure, the
+  // request being blocked, no internet) rather than the API rejecting it --
+  // distinct from AuthenticationError/RateLimitError/etc, which all mean
+  // Anthropic *did* respond. This is what a real "network error" looks like.
+  if (err instanceof Anthropic.APIConnectionError) {
+    return "Couldn't reach Anthropic's servers -- check your internet connection and try again. If this keeps happening, a browser extension, firewall, or network filter may be blocking the request.";
+  }
   if (err instanceof Anthropic.APIError) {
     return `Anthropic API error: ${err.message}`;
+  }
+  // A bare fetch failure that never made it into the SDK's own error
+  // hierarchy above (e.g. thrown before the request could even be built).
+  if (err instanceof TypeError && /fetch/i.test(err.message)) {
+    return "Network error -- couldn't reach the server. Check your internet connection and try again.";
   }
   if (err instanceof Error) return err.message;
   return "Something went wrong talking to Anthropic.";
