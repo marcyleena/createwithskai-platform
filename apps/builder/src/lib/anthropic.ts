@@ -14,8 +14,53 @@ const MAX_TOKENS = 16000;
 const TOO_SHORT_INSTRUCTION =
   "\n\nYour previous attempt got cut off before it finished -- it was too long. This time, keep the app significantly shorter and simpler (fewer files, less code per file) while still being fully functional and complete.";
 
+export interface GenerationProgress {
+  charsSoFar: number;
+  /** Path of the file whose ~~~FILE: marker most recently appeared in the stream, or null before the first one arrives. */
+  currentFile: string | null;
+}
+
 function createClient(apiKey: string): Anthropic {
   return new Anthropic({ apiKey, dangerouslyAllowBrowser: true });
+}
+
+// Only needs the opening marker (not a matching ENDFILE) so the UI can show
+// "Generating X" the moment Claude starts a file, not after it finishes one.
+const FILE_MARKER_PATTERN = /~~~FILE:(.+?)~~~/g;
+
+function latestFileMarker(snapshot: string): string | null {
+  FILE_MARKER_PATTERN.lastIndex = 0;
+  let match: RegExpExecArray | null;
+  let last: string | null = null;
+  while ((match = FILE_MARKER_PATTERN.exec(snapshot)) !== null) {
+    last = match[1].trim();
+  }
+  return last;
+}
+
+// The SDK's `stream.on("text")` fires on every token (tens of times a
+// second), and wiring that directly to a React state setter -- which is what
+// this used to do -- forced a re-render per token. That doesn't slow down
+// generation itself (the model streams at the same rate regardless), but it
+// did make the UI noticeably janky on longer generations, which reads as
+// "slow." Throttling emission to a fixed interval keeps the progress display
+// smooth without hiding real progress: a file-name change always emits
+// immediately (it's the signal users actually care about), everything else
+// is capped to one update per interval.
+const PROGRESS_EMIT_INTERVAL_MS = 150;
+
+function throttledProgressEmitter(onProgress: (progress: GenerationProgress) => void) {
+  let lastEmitAt = 0;
+  let lastFile: string | null = null;
+  return (snapshot: string) => {
+    const currentFile = latestFileMarker(snapshot);
+    const fileChanged = currentFile !== lastFile;
+    const now = Date.now();
+    if (!fileChanged && now - lastEmitAt < PROGRESS_EMIT_INTERVAL_MS) return;
+    lastEmitAt = now;
+    lastFile = currentFile;
+    onProgress({ charsSoFar: snapshot.length, currentFile });
+  };
 }
 
 export function friendlyErrorMessage(err: unknown): string {
@@ -38,7 +83,11 @@ export function friendlyErrorMessage(err: unknown): string {
 // Streams the response and accumulates it as plain text (not JSON) -- see
 // fileParsing.ts for why the file transport itself is delimited text rather
 // than a JSON envelope.
-async function streamText(apiKey: string, prompt: string, onProgress?: (charsSoFar: number) => void): Promise<string> {
+async function streamText(
+  apiKey: string,
+  prompt: string,
+  onProgress?: (progress: GenerationProgress) => void
+): Promise<string> {
   const client = createClient(apiKey);
   const stream = client.messages.stream({
     model: MODEL,
@@ -46,7 +95,8 @@ async function streamText(apiKey: string, prompt: string, onProgress?: (charsSoF
     messages: [{ role: "user", content: prompt }],
   });
   if (onProgress) {
-    stream.on("text", (_delta, snapshot) => onProgress(snapshot.length));
+    const emit = throttledProgressEmitter(onProgress);
+    stream.on("text", (_delta, snapshot) => emit(snapshot));
   }
   return stream.finalText();
 }
@@ -57,7 +107,7 @@ async function streamText(apiKey: string, prompt: string, onProgress?: (charsSoF
 async function generateWithRetry(
   apiKey: string,
   prompt: string,
-  onProgress?: (charsSoFar: number) => void
+  onProgress?: (progress: GenerationProgress) => void
 ): Promise<GeneratedFile[]> {
   try {
     const text = await streamText(apiKey, prompt, onProgress);
@@ -105,7 +155,7 @@ export async function generateApp(
   apiKey: string,
   stack: Stack,
   answers: IntakeAnswers,
-  onProgress?: (charsSoFar: number) => void
+  onProgress?: (progress: GenerationProgress) => void
 ): Promise<GeneratedFile[]> {
   return generateWithRetry(apiKey, buildGenerationPrompt(stack, answers), onProgress);
 }
@@ -115,7 +165,7 @@ export async function requestChange(
   stack: Stack,
   currentFiles: GeneratedFile[],
   request: string,
-  onProgress?: (charsSoFar: number) => void
+  onProgress?: (progress: GenerationProgress) => void
 ): Promise<GeneratedFile[]> {
   if (currentFiles.length === 0) {
     // Nothing to send as context -- this would silently turn into a

@@ -1,6 +1,7 @@
 import type { ConsiderationAnswer, IntakeAnswers, Stack } from "./types";
 import { findStyleTile } from "./styleTiles";
 import { resolveAppName } from "./naming";
+import { findFixedQuestion, NOT_SURE_VALUE } from "./considerations";
 
 // Files are transported as plain delimited text, not JSON. Real source code
 // is full of quotes, backslashes, and template literals that are easy for a
@@ -20,21 +21,33 @@ const REACT_FILE_RULES = `Rules for src/App.jsx specifically, because it also ha
 - Do not import CSS files inside App.jsx; styling lives in src/index.css and is loaded separately.
 - The whole app must live in this one component file -- no other component files, no code-splitting.`;
 
+// Static-html apps embed their <style> tag inline rather than shipping a
+// separate CSS file, so the "CSS file first" ordering below doesn't apply --
+// this note tells the model to still front-load the theme within that one
+// file instead of writing markup first and styling as an afterthought.
+const STATIC_HTML_STYLE_FIRST_RULE = `Write the <style> block, with the full color palette and typography defined as CSS custom properties on :root, immediately after <head> opens -- before any markup or script. That way the theme is complete and applied even if the response gets cut off partway through the rest of the file.`;
+
 function stackInstructions(stack: Stack): string {
   if (stack === "static-html") {
     return `Generate a single, complete HTML file with embedded <style> and <script> tags. No external dependencies, no build step, no imports -- it must be fully self-contained and immediately functional when opened directly in a browser.
+${STATIC_HTML_STYLE_FIRST_RULE}
 Produce exactly one file, named exactly "index.html", and make it the first and only thing in your output.
 ${FILE_FORMAT}`;
   }
 
-  const entryFirstRule = `Output "src/App.jsx" FIRST, before any other file -- it is the app's entry point and the live preview depends on it. Producing it first guarantees it exists even if your response gets cut off before you finish the remaining files.`;
+  // CSS is output before App.jsx (reversing the old App.jsx-first order) so
+  // the color palette, typography, and theme are guaranteed to be complete
+  // even if the response gets cut off before the rest of the files finish --
+  // the alternative (App.jsx first) let a truncated response ship a fully
+  // functional but completely unstyled app on the very first generation.
+  const styleFirstRule = `Output "src/index.css" FIRST, before any other file -- it defines the color palette, typography, and theme that every component depends on for the live preview to look right from the very first render. Producing it first guarantees the app's styling is never cut off even if your response ends early.`;
 
   if (stack === "react-localstorage") {
     return `Generate a small React app (Vite + React) that uses plain useState/useEffect and the browser's localStorage API to persist data between sessions.
-${entryFirstRule}
+${styleFirstRule}
 Produce exactly these files, in this order:
-- src/App.jsx (the entire app -- FIRST)
-- src/index.css (styling)
+- src/index.css (color palette, typography, and theme -- FIRST)
+- src/App.jsx (the entire app)
 - src/main.jsx (mounts <App /> from src/App.jsx into #root)
 - index.html (loads /src/main.jsx as a module script)
 - vite.config.js
@@ -45,10 +58,10 @@ ${FILE_FORMAT}`;
 
   return `Generate a small React app (Vite + React) that needs user accounts and/or a shared database via Supabase.
 A Supabase client is already created and available as the global "window.supabase" -- call it directly from App.jsx (e.g. window.supabase.auth.signInWithPassword({ email, password }), window.supabase.from("table_name").select("*")). Do not import or create a Supabase client inside App.jsx.
-${entryFirstRule}
+${styleFirstRule}
 Produce exactly these files, in this order:
-- src/App.jsx (the entire app, using window.supabase for every backend call -- FIRST)
-- src/index.css (styling)
+- src/index.css (color palette, typography, and theme -- FIRST)
+- src/App.jsx (the entire app, using window.supabase for every backend call)
 - src/main.jsx (creates the real Supabase client from import.meta.env.VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY, assigns it to window.supabase, then mounts <App />)
 - index.html
 - vite.config.js
@@ -77,20 +90,31 @@ const QUALITY_BAR = `Build this to production-ready quality -- something the use
 Generate both of these automatically whenever they apply -- do not wait for the user to ask for them.`;
 
 export function buildConsiderationsPrompt(intakeSummary: string): string {
-  return `Based on this app description, generate five to eight short consideration questions the builder should think about before generating their app. Focus on questions specific to this type of app that a non-technical user would not think to ask on their own. Each question should be answerable with Yes, No, or Not sure. Return only a JSON array of question strings, nothing else.
+  return `Based on this app description, generate five to eight short consideration questions the builder should think about before generating their app. Focus on questions specific to this type of app that a non-technical user would not think to ask on their own. Each question must be genuinely answerable with Yes, No, or Not sure -- never generate a question that really asks the user to choose between multiple named options (e.g. "should exports be CSV, PDF, or both?") or that expects a free-text answer. If a question would naturally need that kind of answer, either drop it or rephrase it into a strict yes/no question instead. Return only a JSON array of question strings, nothing else.
 
 App description: ${intakeSummary}`;
 }
 
-// Only Yes/No answers carry real instruction -- "Not sure" means "apply a
-// sensible default," which is already the model's fallback behavior, so
-// including it would just be noise. `considerations` is optional because
-// builds saved before this feature exist without the field.
+// Only a real decision carries instruction -- "Not sure" (toggle) and the
+// shared not-sure select option both mean "apply a sensible default," which
+// is already the model's fallback behavior, so including them would just be
+// noise. `considerations` is optional because builds saved before this
+// feature exist without the field.
 function formatConsiderationsBlock(considerations: Record<string, ConsiderationAnswer> | undefined): string {
   if (!considerations) return "";
-  const lines = Object.entries(considerations)
-    .filter(([, answer]) => answer === "yes" || answer === "no")
-    .map(([question, answer]) => `${question}: ${answer === "yes" ? "Yes" : "No"}`);
+  const lines: string[] = [];
+  for (const [question, answer] of Object.entries(considerations)) {
+    if (!answer || answer === NOT_SURE_VALUE) continue;
+    const definition = findFixedQuestion(question);
+    if (definition?.kind === "select") {
+      const option = definition.options?.find((o) => o.value === answer);
+      if (option) lines.push(`${question}: ${option.label}`);
+    } else if (answer === "yes" || answer === "no") {
+      // Dynamic (Claude-generated) questions have no fixed definition and
+      // are always toggle-type, so they fall through to this branch too.
+      lines.push(`${question}: ${answer === "yes" ? "Yes" : "No"}`);
+    }
+  }
   if (lines.length === 0) return "";
   return `USER CONSIDERATIONS:\n${lines.join("\n")}`;
 }
@@ -112,6 +136,8 @@ function colorPaletteText(answers: IntakeAnswers): string {
   }
   return "No specific colors were given -- invent a cohesive color palette that matches the visual direction above, and apply it consistently across every screen and component.";
 }
+
+const CSS_CUSTOM_PROPERTIES_RULE = `The color palette above MUST be defined as CSS custom properties at the root level (:root in src/index.css, or in the <style> block for a static HTML app) -- e.g. --color-primary, --color-secondary, --color-background, --color-text -- and every component's styling must reference them with var(--color-primary) etc. Never hardcode hex/rgb colors that bypass the palette.`;
 
 function aiFeatureText(answers: IntakeAnswers): string {
   if (!answers.usesAI) return "";
@@ -138,6 +164,7 @@ Who it's for: ${answers.audience}
 Visual direction: ${visualDirectionText(answers)}
 Color palette: ${colorPaletteText(answers)}
 Apply this visual direction and color palette throughout the app -- typography, spacing, and every component's styling should consistently reflect it. Do not fall back to a generic look.
+${CSS_CUSTOM_PROPERTIES_RULE}
 
 Core features (implement every one of these completely and end to end -- no placeholders):
 ${featureList}

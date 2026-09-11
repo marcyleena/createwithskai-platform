@@ -7,7 +7,10 @@ export interface GeneratedFile {
 
 export type StyleTileId = "clean-minimal" | "bold-vibrant" | "soft-feminine" | "dark-sleek";
 
-export type ConsiderationAnswer = "yes" | "no" | "not_sure";
+// "yes" | "no" | "not_sure" for toggle-type consideration questions, or a
+// select option's value (e.g. "subscription", "csv") for select-type ones --
+// see ConsiderationQuestion in lib/considerations.ts.
+export type ConsiderationAnswer = string;
 
 export interface IntakeAnswers {
   appName: string;

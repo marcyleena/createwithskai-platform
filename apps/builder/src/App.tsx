@@ -12,7 +12,7 @@ import { DeploySection } from "./components/DeploySection";
 import { useApiKey } from "./hooks/useApiKey";
 import { useCredential } from "./hooks/useCredential";
 import { useBuilds } from "./hooks/useBuilds";
-import { generateApp, requestChange, friendlyErrorMessage } from "./lib/anthropic";
+import { generateApp, requestChange, friendlyErrorMessage, type GenerationProgress } from "./lib/anthropic";
 import { determineStack, STACK_LABELS } from "./lib/stackDetection";
 import { deployApp, type DeployResult } from "./lib/deployClient";
 import { consumeGithubOAuthResult } from "./lib/githubOAuth";
@@ -56,9 +56,9 @@ function BuilderApp() {
   const [answers, setAnswers] = useState<IntakeAnswers | null>(null);
 
   const [generateError, setGenerateError] = useState<string | null>(null);
-  const [generateProgress, setGenerateProgress] = useState(0);
+  const [generateProgress, setGenerateProgress] = useState<GenerationProgress>({ charsSoFar: 0, currentFile: null });
   const [changeRequesting, setChangeRequesting] = useState(false);
-  const [changeProgress, setChangeProgress] = useState(0);
+  const [changeProgress, setChangeProgress] = useState<GenerationProgress>({ charsSoFar: 0, currentFile: null });
   const [changeError, setChangeError] = useState<string | null>(null);
   const [deploying, setDeploying] = useState(false);
   const [deployError, setDeployError] = useState<string | null>(null);
@@ -86,7 +86,7 @@ function BuilderApp() {
     setStack(detectedStack);
     setMode("generating");
     setGenerateError(null);
-    setGenerateProgress(0);
+    setGenerateProgress({ charsSoFar: 0, currentFile: null });
 
     try {
       const generatedFiles = await generateApp(apiKey!, detectedStack, newAnswers, setGenerateProgress);
@@ -108,7 +108,7 @@ function BuilderApp() {
   async function handleChangeRequest(request: string) {
     setChangeRequesting(true);
     setChangeError(null);
-    setChangeProgress(0);
+    setChangeProgress({ charsSoFar: 0, currentFile: null });
     try {
       const updatedFiles = await requestChange(apiKey!, stack, files, request, setChangeProgress);
       setFiles(updatedFiles);
@@ -246,10 +246,14 @@ function BuilderApp() {
             <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
               <div className="h-8 w-8 animate-spin rounded-full border-2 border-taupe/40 border-t-accent-pink" />
               <p className="text-sm text-espresso/70">
-                Building your {STACK_LABELS[stack].toLowerCase()} app...
+                {generateProgress.currentFile
+                  ? `Generating ${basename(generateProgress.currentFile)}...`
+                  : `Building your ${STACK_LABELS[stack].toLowerCase()} app...`}
               </p>
-              {generateProgress > 0 && (
-                <p className="text-xs text-espresso/40">{generateProgress.toLocaleString()} characters generated</p>
+              {generateProgress.charsSoFar > 0 && (
+                <p className="text-xs text-espresso/40">
+                  {generateProgress.charsSoFar.toLocaleString()} characters generated
+                </p>
               )}
             </div>
           )}
@@ -268,8 +272,14 @@ function BuilderApp() {
               </div>
 
               <ChangeRequestBar onSubmit={handleChangeRequest} disabled={changeRequesting} />
-              {changeRequesting && changeProgress > 0 && (
-                <p className="text-xs text-espresso/40">{changeProgress.toLocaleString()} characters generated</p>
+              {changeRequesting && (
+                <p className="text-xs text-espresso/40">
+                  {changeProgress.currentFile
+                    ? `Generating ${basename(changeProgress.currentFile)}...`
+                    : "Working on it..."}
+                  {changeProgress.charsSoFar > 0 &&
+                    ` (${changeProgress.charsSoFar.toLocaleString()} characters generated)`}
+                </p>
               )}
               {changeError && <p className="text-sm text-red-600">{changeError}</p>}
 
@@ -295,6 +305,10 @@ function BuilderApp() {
       </div>
     </div>
   );
+}
+
+function basename(path: string): string {
+  return path.split("/").pop() || path;
 }
 
 function MenuIcon(props: React.SVGProps<SVGSVGElement>) {
