@@ -28,10 +28,12 @@ export interface ConsiderationSection {
 export const NOT_SURE_VALUE = "not_sure";
 
 export const MONETIZATION_QUESTION = "How will this app be monetized?";
-export const MONETIZATION_DATA_QUESTION =
-  "If paid, what should happen to a user's data if they cancel or stop paying?";
+export const MONETIZATION_DATA_QUESTION = "What happens to a user's data if they cancel or stop paying?";
 
 const PAID_MONETIZATION_VALUES = new Set(["one_time", "subscription"]);
+
+export const EXPORT_QUESTION = "Should users be able to export their data?";
+export const EXPORT_FORMAT_QUESTION = "What format?";
 
 export const FIXED_SECTIONS: ConsiderationSection[] = [
   {
@@ -49,10 +51,18 @@ export const FIXED_SECTIONS: ConsiderationSection[] = [
       { text: "Is mobile the primary device your users will use?", kind: "toggle" },
       { text: "Should users be able to share specific pages or items with a direct link?", kind: "toggle" },
       // Originally phrased as "...work offline or does it always need an internet
-      // connection?" -- a compound sentence that reads like it wants two
-      // answers. It's really one binary question, so it stays a toggle once
-      // reworded to ask only the one thing.
-      { text: "Should the app work offline without needing an internet connection?", kind: "toggle" },
+      // connection?" -- a compound sentence offering two named states, not a
+      // plain yes/no. Modeled as a select (rather than a toggle) so each
+      // option can spell out what it means in plain language.
+      {
+        text: "Does the app need to work offline?",
+        kind: "select",
+        options: [
+          { value: "yes", label: "Yes -- must work without internet" },
+          { value: "no", label: "No -- always requires internet" },
+          { value: NOT_SURE_VALUE, label: "Not sure" },
+        ],
+      },
       { text: "Should users be able to add the app to their phone home screen?", kind: "toggle" },
     ],
   },
@@ -73,8 +83,8 @@ export const FIXED_SECTIONS: ConsiderationSection[] = [
         text: MONETIZATION_DATA_QUESTION,
         kind: "select",
         options: [
-          { value: "retain_lose_access", label: "Retain their data but lose access to paid features" },
-          { value: "delete_after_grace", label: "Delete their data after a grace period" },
+          { value: "retain_lose_access", label: "They keep their data but lose access to paid features" },
+          { value: "delete_after_grace", label: "Their data is deleted after a grace period" },
           { value: NOT_SURE_VALUE, label: "Not sure yet" },
         ],
         showIf: (considerations) => PAID_MONETIZATION_VALUES.has(considerations[MONETIZATION_QUESTION]),
@@ -84,18 +94,21 @@ export const FIXED_SECTIONS: ConsiderationSection[] = [
   {
     title: "Data management",
     questions: [
+      // Originally a single question "...as a CSV or PDF?" that conflated
+      // whether export should exist at all with which format it should use.
+      // Split into a plain yes/no plus a conditional follow-up so the
+      // format choice only appears once export itself has been said yes to.
+      { text: EXPORT_QUESTION, kind: "toggle" },
       {
-        // Originally "...as a CSV or PDF?" -- a genuine choice between two
-        // formats (or both, or neither), not a yes/no question.
-        text: "Should users be able to export their data?",
+        text: EXPORT_FORMAT_QUESTION,
         kind: "select",
         options: [
-          { value: "none", label: "No export needed" },
-          { value: "csv", label: "Yes, as CSV" },
-          { value: "pdf", label: "Yes, as PDF" },
-          { value: "both", label: "Yes, both CSV and PDF" },
-          { value: NOT_SURE_VALUE, label: "Not sure yet" },
+          { value: "csv", label: "CSV" },
+          { value: "pdf", label: "PDF" },
+          { value: "both", label: "Both" },
+          { value: NOT_SURE_VALUE, label: "Not sure" },
         ],
+        showIf: (considerations) => considerations[EXPORT_QUESTION] === "yes",
       },
       { text: "Is there a limit to how much data a user can add?", kind: "toggle" },
       { text: "Should the app remember where the user left off when they come back?", kind: "toggle" },
