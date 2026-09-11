@@ -175,14 +175,23 @@ export function buildPreviewDocument(files: GeneratedFile[], stack: Stack): stri
     return appFile.content;
   }
 
-  const cssFile = findFile(files, "index.css");
+  // The generation prompt has Claude emit a minimal src/index.css up front
+  // (custom properties only) and, if the response runs long, come back at
+  // the end for the full component styling -- either by rewriting
+  // src/index.css (parseGeneratedFiles keeps only that later, complete
+  // version) or by adding a separate src/components.css. Concatenating
+  // every *.css file covers both without caring which one Claude picked.
+  const css = files
+    .filter((f) => f.path.toLowerCase().endsWith(".css"))
+    .map((f) => f.content)
+    .join("\n");
   const appCode = stripModuleSyntax(appFile.content);
 
   return `<!doctype html>
 <html>
 <head>
   <meta charset="utf-8" />
-  ${reactPreviewHead(cssFile?.content ?? "", stack)}
+  ${reactPreviewHead(css, stack)}
 </head>
 <body>
   <div id="root"></div>
