@@ -90,7 +90,16 @@ const QUALITY_BAR = `Build this to production-ready quality -- something the use
 Generate both of these automatically whenever they apply -- do not wait for the user to ask for them.`;
 
 export function buildConsiderationsPrompt(intakeSummary: string): string {
-  return `Based on this app description, generate five to eight short consideration questions the builder should think about before generating their app. Focus on questions specific to this type of app that a non-technical user would not think to ask on their own. Each question must be genuinely answerable with Yes, No, or Not sure -- never generate a question that really asks the user to choose between multiple named options (e.g. "should exports be CSV, PDF, or both?") or that expects a free-text answer. If a question would naturally need that kind of answer, either drop it or rephrase it into a strict yes/no question instead. Return only a JSON array of question strings, nothing else.
+  return `Based on this app description, generate consideration questions the builder should think about before generating their app. These are specific to this type of app -- things a non-technical user would not think to ask on their own.
+
+Follow these rules exactly:
+1. Every question must be answerable with a simple Yes or No -- or Yes, No, Not sure if uncertainty is genuinely valid. Never generate a question that requires choosing between more than two named options.
+2. Never generate a compound question that asks two things at once. If two things need to be asked, make them two separate questions.
+3. Never generate a vague or technical question a non-technical user wouldn't understand. Use plain, everyday language.
+4. If a consideration would naturally require choosing between named options -- for example a question about frequency or format -- rephrase it as a Yes/No question instead, and let the generation prompt work out the specifics from that Yes. For example, instead of "How often should the app send notifications -- daily, weekly, or monthly?" ask "Should the app send users notifications?"
+5. Generate five to eight questions total, maximum. Prioritize the most impactful considerations specific to this app -- not generic questions that would apply to any app.
+
+Return only a JSON array of question strings, nothing else.
 
 App description: ${intakeSummary}`;
 }
