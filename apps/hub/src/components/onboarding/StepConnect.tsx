@@ -1,6 +1,7 @@
 import { Button } from "@createwithskai/ui";
 import { ApiKeyGuideCard } from "../ApiKeyGuideCard";
 import { GithubGuideCard } from "../GithubGuideCard";
+import { SupabaseGuideCard } from "../SupabaseGuideCard";
 
 export function StepConnect({ onNext }: { onNext: () => void }) {
   return (
@@ -24,6 +25,12 @@ export function StepConnect({ onNext }: { onNext: () => void }) {
             valueKey="token"
             placeholder="Vercel API token"
           />
+          <div>
+            <SupabaseGuideCard />
+            <p className="mt-1.5 px-1 text-xs text-taupe">
+              Optional -- only needed for database-powered apps. You can add this later.
+            </p>
+          </div>
         </div>
 
         <div className="mt-8 flex justify-center">

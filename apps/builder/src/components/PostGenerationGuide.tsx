@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button } from "@createwithskai/ui";
 import type { DeployResult } from "../lib/deployClient";
-import type { IntakeAnswers } from "../lib/types";
+import type { IntakeAnswers, Stack } from "../lib/types";
 
 function ChecklistIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
@@ -73,6 +73,7 @@ const COACH_URL = "https://coach.createwithskai.cloud";
 
 interface PostGenerationGuideProps {
   answers: IntakeAnswers | null;
+  stack: Stack;
   deployResult: DeployResult | null;
   onAddFeature: (description: string) => void;
   addingFeature: boolean;
@@ -80,6 +81,7 @@ interface PostGenerationGuideProps {
 
 export function PostGenerationGuide({
   answers,
+  stack,
   deployResult,
   onAddFeature,
   addingFeature,
@@ -87,6 +89,7 @@ export function PostGenerationGuide({
   const [expanded, setExpanded] = useState(true);
   const [suggestionsExpanded, setSuggestionsExpanded] = useState(true);
   const [checked, setChecked] = useState<boolean[]>(() => CHECKLIST_ITEMS.map(() => false));
+  const [supabaseChecked, setSupabaseChecked] = useState(false);
 
   function toggleChecked(index: number) {
     setChecked((prev) => prev.map((v, i) => (i === index ? !v : v)));
@@ -137,6 +140,38 @@ export function PostGenerationGuide({
                   </label>
                 </li>
               ))}
+              {stack === "react-supabase" && (
+                <li>
+                  {/* Not a <label>-wrapped checkbox like the items above --
+                      a native label forwards any click on a descendant
+                      (including the link below) to toggle the checkbox,
+                      which would fight with the link's own click behavior. */}
+                  <div
+                    className={`flex items-start gap-3 rounded-lg p-2 transition-opacity ${
+                      supabaseChecked ? "opacity-50" : ""
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={supabaseChecked}
+                      onChange={() => setSupabaseChecked((v) => !v)}
+                      className="mt-0.5 h-4 w-4 flex-none cursor-pointer accent-accent-pink"
+                    />
+                    <span className={`text-sm text-espresso ${supabaseChecked ? "line-through" : ""}`}>
+                      Connect your Supabase account in your{" "}
+                      <a
+                        href="https://createwithskai.cloud/#connection-supabase"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-accent-pink underline underline-offset-4"
+                      >
+                        hub dashboard
+                      </a>{" "}
+                      to power the database features in your deployed app.
+                    </span>
+                  </div>
+                </li>
+              )}
             </ul>
           </section>
 

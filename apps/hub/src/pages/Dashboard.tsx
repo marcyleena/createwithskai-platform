@@ -5,6 +5,7 @@ import { SiteHeader } from "../components/SiteHeader";
 import { ToolNavCard } from "../components/ToolNavCard";
 import { ApiKeyGuideCard } from "../components/ApiKeyGuideCard";
 import { GithubGuideCard } from "../components/GithubGuideCard";
+import { SupabaseGuideCard } from "../components/SupabaseGuideCard";
 import { GettingStartedChecklist } from "../components/dashboard/GettingStartedChecklist";
 import { NextStepPrompt } from "../components/dashboard/NextStepPrompt";
 import { DeleteAccountSection } from "../components/dashboard/DeleteAccountSection";
@@ -84,6 +85,7 @@ export function Dashboard() {
                   valueKey="token"
                   placeholder="Vercel API token"
                 />
+                <SupabaseGuideCard />
               </div>
             </div>
 

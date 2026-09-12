@@ -327,6 +327,7 @@ function BuilderApp() {
               <PostGenerationGuide
                 key={activeBuildId ?? "new"}
                 answers={answers}
+                stack={stack}
                 deployResult={deployResult}
                 onAddFeature={handleChangeRequest}
                 addingFeature={changeRequesting}

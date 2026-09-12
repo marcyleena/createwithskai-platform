@@ -71,4 +71,18 @@ export const CONNECTION_GUIDES: Record<string, ConnectionGuide> = {
     ],
     primaryLink: { label: "Go to Vercel Tokens", href: "https://vercel.com/account/tokens" },
   },
+  supabase: {
+    id: "connection-supabase",
+    title: "Supabase",
+    subtitle: "Required for App Builder apps that need a database.",
+    steps: [
+      "Go to supabase.com and create a free account",
+      "Click New Project and create a project for your app",
+      "Once created go to Settings -- API in the left sidebar",
+      "Copy your Project URL and your anon/public API key",
+      "Paste both below",
+    ],
+    note: "Only needed if you build an app that requires a database. The App Builder will tell you when this applies.",
+    primaryLink: { label: "Go to Supabase", href: "https://supabase.com" },
+  },
 };
