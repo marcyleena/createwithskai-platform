@@ -1,7 +1,8 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Button, Input } from "@createwithskai/ui";
 import { useCredential } from "../hooks/useCredential";
 import { CONNECTION_GUIDES } from "../lib/connectionGuides";
+import { loadSupabaseCardDraft, saveSupabaseCardDraft, clearSupabaseCardDraft } from "../lib/supabaseCardDraft";
 import { GuideCard } from "./GuideCard";
 
 // Unlike ApiKeyGuideCard, Supabase needs two separate credential rows
@@ -11,10 +12,26 @@ export function SupabaseGuideCard() {
   const guide = CONNECTION_GUIDES.supabase;
   const projectUrlCredential = useCredential("supabase", "project_url");
   const anonKeyCredential = useCredential("supabase", "anon_key");
-  const [projectUrl, setProjectUrl] = useState("");
-  const [anonKey, setAnonKey] = useState("");
+  const [projectUrl, setProjectUrl] = useState(() => loadSupabaseCardDraft()?.projectUrl ?? "");
+  const [anonKey, setAnonKey] = useState(() => loadSupabaseCardDraft()?.anonKey ?? "");
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Getting the anon key means switching to Supabase in another tab first --
+  // if that tab switch causes this one to reload or get discarded (browsers
+  // increasingly do this for backgrounded tabs), in-memory state for
+  // whatever was already typed here is gone. Persisting to localStorage on
+  // every change and restoring it above survives that. Cleared on a
+  // successful save (both setters below reset to "", which this effect
+  // reads as "nothing to persist") or here whenever the user backs out both
+  // fields by hand.
+  useEffect(() => {
+    if (!projectUrl.trim() && !anonKey.trim()) {
+      clearSupabaseCardDraft();
+      return;
+    }
+    saveSupabaseCardDraft({ projectUrl, anonKey });
+  }, [projectUrl, anonKey]);
 
   const loading = projectUrlCredential.loading || anonKeyCredential.loading;
   const hasBoth = Boolean(projectUrlCredential.credential) && Boolean(anonKeyCredential.credential);
@@ -43,6 +60,9 @@ export function SupabaseGuideCard() {
 
   async function handleRemove() {
     setEditing(false);
+    setProjectUrl("");
+    setAnonKey("");
+    clearSupabaseCardDraft();
     await Promise.all([projectUrlCredential.remove(), anonKeyCredential.remove()]);
   }
 
@@ -74,16 +94,18 @@ export function SupabaseGuideCard() {
               type="text"
               value={projectUrl}
               onChange={(e) => setProjectUrl(e.target.value)}
-              placeholder="https://yourproject.supabase.co"
+              placeholder="https://xxxxxxxxxxxxxxxxxxxx.supabase.co"
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-espresso/60">Anon key</label>
+            <label className="mb-1 block text-xs font-medium text-espresso/60">
+              Anon key <span className="font-normal text-espresso/40">(anon / public -- not service_role)</span>
+            </label>
             <Input
               type="password"
               value={anonKey}
               onChange={(e) => setAnonKey(e.target.value)}
-              placeholder="your anon/public key"
+              placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
             />
           </div>
           <div className="flex gap-2">

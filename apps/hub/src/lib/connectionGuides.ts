@@ -78,8 +78,10 @@ export const CONNECTION_GUIDES: Record<string, ConnectionGuide> = {
     steps: [
       "Go to supabase.com and create a free account",
       "Click New Project and create a project for your app",
-      "Once created go to Settings -- API in the left sidebar",
-      "Copy your Project URL and your anon/public API key",
+      "On your project's Overview page, copy the Project URL shown near the top",
+      "In the left sidebar go to Settings -- API",
+      "Under Project API keys, copy the key labeled anon / public",
+      "Important -- do not copy the service_role key. It bypasses all security rules and should never be used outside a secure server.",
       "Paste both below",
     ],
     note: "Only needed if you build an app that requires a database. The App Builder will tell you when this applies.",
