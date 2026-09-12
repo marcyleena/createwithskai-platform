@@ -35,10 +35,17 @@ export function LivePreview({ files, stack }: LivePreviewProps) {
       </div>
       <div className="flex-none space-y-0.5 border-b border-taupe/20 bg-pink/10 px-3 py-1.5 text-center text-xs text-taupe">
         <p>Preview mode -- data resets on refresh. Your deployed app will save data normally.</p>
-        <p>
-          Preview tip: if you see a login screen, the app has authentication enabled. Use any email
-          and password to create a test account.
-        </p>
+        {stack === "react-supabase" ? (
+          <p>
+            Preview tip: this app's Supabase calls are mocked here, pre-signed-in as a test user, so
+            protected screens show up immediately. Sign out in the app to see its login screen instead.
+          </p>
+        ) : (
+          <p>
+            Preview tip: if you see a login screen, the app has authentication enabled. Use any email
+            and password to create a test account.
+          </p>
+        )}
       </div>
       {blobUrl ? (
         <iframe

@@ -47,63 +47,141 @@ const localStorage = {
 // A minimal in-memory mock of the supabase-js client surface, so
 // react-supabase previews are fully interactive without ever touching the
 // platform's real Supabase project. Data resets whenever the preview reloads.
+//
+// The query builder defers execution until the chain is actually awaited
+// (via the thenable .then() below) or a terminal method (.single() /
+// .maybeSingle()) is called -- every other method just records what was
+// asked for and returns the same builder object so it stays chainable in
+// any order. The previous version had .select() execute and return a
+// Promise immediately, which broke any filter/order/limit call placed
+// after it (e.g. ".select().order(...)") -- exactly the "is not a
+// function" errors this replaces.
 const MOCK_SUPABASE_CLIENT_SOURCE = `
 window.supabase = (function () {
   var tables = {};
-  var currentUser = null;
+  // Pre-authenticated by default so a generated app's auth-gated screens
+  // (checking getUser()/getSession() on mount, or subscribing via
+  // onAuthStateChange) render immediately in the preview instead of
+  // bouncing to a login screen. Calling auth.signOut() still works, for
+  // anyone who wants to see the signed-out state on purpose.
+  var currentUser = { id: "mock-preview-user", email: "preview@example.com" };
   var authListeners = [];
 
   function rows(name) {
     if (!tables[name]) tables[name] = [];
     return tables[name];
   }
+  function newId() { return "mock-" + Math.random().toString(36).slice(2); }
+  function escapeRegExp(s) { return String(s).replace(/[.*+?^\${}()|[\\]\\\\]/g, "\\\\$&"); }
+  function wildcardToRegExp(pattern, caseInsensitive) {
+    var body = escapeRegExp(pattern).replace(/%/g, ".*").replace(/_/g, ".");
+    return new RegExp("^" + body + "$", caseInsensitive ? "i" : "");
+  }
+  function matchesFilter(cell, op, val) {
+    switch (op) {
+      case "eq": return cell === val;
+      case "neq": return cell !== val;
+      case "gt": return cell > val;
+      case "gte": return cell >= val;
+      case "lt": return cell < val;
+      case "lte": return cell <= val;
+      case "like": return typeof cell === "string" && wildcardToRegExp(val, false).test(cell);
+      case "ilike": return typeof cell === "string" && wildcardToRegExp(val, true).test(cell);
+      case "in": return Array.isArray(val) && val.indexOf(cell) > -1;
+      default: return true;
+    }
+  }
   function applyFilters(list, filters) {
     return list.filter(function (row) {
-      return filters.every(function (f) { return row[f[0]] === f[1]; });
+      return filters.every(function (f) { return matchesFilter(row[f[0]], f[1], f[2]); });
     });
   }
   function notifyAuth(event) {
     authListeners.forEach(function (cb) { cb(event, currentUser ? { user: currentUser } : null); });
   }
+
   function queryBuilder(name) {
+    var op = "select";
+    var payload = null;
     var filters = [];
-    var builder = {
-      select: function () { return Promise.resolve({ data: applyFilters(rows(name), filters), error: null }); },
-      insert: function (payload) {
-        var items = Array.isArray(payload) ? payload : [payload];
-        var withIds = items.map(function (item) {
-          return Object.assign({ id: "mock-" + Math.random().toString(36).slice(2) }, item);
+    var orderBy = null;
+    var limitCount = null;
+    var rangeFrom = null;
+    var rangeTo = null;
+
+    function execute() {
+      var result;
+      if (op === "insert") {
+        var inserted = (Array.isArray(payload) ? payload : [payload]).map(function (item) {
+          return Object.assign({ id: newId() }, item);
         });
-        rows(name).push.apply(rows(name), withIds);
-        return Promise.resolve({ data: withIds, error: null });
-      },
-      update: function (payload) {
-        var matched = applyFilters(rows(name), filters);
-        matched.forEach(function (row) { Object.assign(row, payload); });
-        return Promise.resolve({ data: matched, error: null });
-      },
-      delete: function () {
-        var matched = applyFilters(rows(name), filters);
-        matched.forEach(function (row) {
+        rows(name).push.apply(rows(name), inserted);
+        result = inserted;
+      } else if (op === "upsert") {
+        result = (Array.isArray(payload) ? payload : [payload]).map(function (item) {
+          var existing = item.id ? rows(name).filter(function (r) { return r.id === item.id; })[0] : null;
+          if (existing) { Object.assign(existing, item); return existing; }
+          var withId = Object.assign({ id: newId() }, item);
+          rows(name).push(withId);
+          return withId;
+        });
+      } else if (op === "update") {
+        result = applyFilters(rows(name), filters);
+        result.forEach(function (row) { Object.assign(row, payload); });
+      } else if (op === "delete") {
+        result = applyFilters(rows(name), filters);
+        result.forEach(function (row) {
           var idx = rows(name).indexOf(row);
           if (idx > -1) rows(name).splice(idx, 1);
         });
-        return Promise.resolve({ data: matched, error: null });
-      },
-      eq: function (col, val) { filters.push([col, val]); return builder; },
-      order: function () { return builder; },
-      limit: function () { return builder; },
+      } else {
+        result = applyFilters(rows(name), filters);
+        if (orderBy) {
+          result = result.slice().sort(function (a, b) {
+            var av = a[orderBy.col], bv = b[orderBy.col];
+            var cmp = av < bv ? -1 : av > bv ? 1 : 0;
+            return orderBy.ascending ? cmp : -cmp;
+          });
+        }
+        if (rangeFrom != null) {
+          result = result.slice(rangeFrom, rangeTo != null ? rangeTo + 1 : undefined);
+        } else if (limitCount != null) {
+          result = result.slice(0, limitCount);
+        }
+      }
+      return { data: result, error: null };
+    }
+
+    var builder = {
+      select: function () { return builder; },
+      insert: function (p) { op = "insert"; payload = p; return builder; },
+      update: function (p) { op = "update"; payload = p; return builder; },
+      upsert: function (p) { op = "upsert"; payload = p; return builder; },
+      delete: function () { op = "delete"; return builder; },
+      eq: function (col, val) { filters.push([col, "eq", val]); return builder; },
+      neq: function (col, val) { filters.push([col, "neq", val]); return builder; },
+      gt: function (col, val) { filters.push([col, "gt", val]); return builder; },
+      gte: function (col, val) { filters.push([col, "gte", val]); return builder; },
+      lt: function (col, val) { filters.push([col, "lt", val]); return builder; },
+      lte: function (col, val) { filters.push([col, "lte", val]); return builder; },
+      like: function (col, val) { filters.push([col, "like", val]); return builder; },
+      ilike: function (col, val) { filters.push([col, "ilike", val]); return builder; },
+      in: function (col, vals) { filters.push([col, "in", vals]); return builder; },
+      filter: function (col, filterOp, val) { filters.push([col, filterOp, val]); return builder; },
+      order: function (col, opts) { orderBy = { col: col, ascending: !opts || opts.ascending !== false }; return builder; },
+      limit: function (n) { limitCount = n; return builder; },
+      range: function (from, to) { rangeFrom = from; rangeTo = to; return builder; },
       single: function () {
-        var match = applyFilters(rows(name), filters)[0] || null;
-        return Promise.resolve({ data: match, error: null });
+        var r = execute();
+        return Promise.resolve({ data: (r.data && r.data[0]) || null, error: null });
       },
       maybeSingle: function () {
-        var match = applyFilters(rows(name), filters)[0] || null;
-        return Promise.resolve({ data: match, error: null });
+        var r = execute();
+        return Promise.resolve({ data: (r.data && r.data[0]) || null, error: null });
       },
-      then: function (resolve, reject) {
-        return this.select().then(resolve, reject);
-      },
+      then: function (resolve, reject) { return Promise.resolve(execute()).then(resolve, reject); },
+      catch: function (reject) { return Promise.resolve(execute()).catch(reject); },
+      finally: function (cb) { return Promise.resolve(execute()).finally(cb); },
     };
     return builder;
   }
@@ -111,14 +189,14 @@ window.supabase = (function () {
   return {
     auth: {
       signUp: function (creds) {
-        currentUser = { id: "mock-" + Date.now(), email: creds.email };
+        currentUser = { id: newId(), email: creds && creds.email };
         notifyAuth("SIGNED_IN");
-        return Promise.resolve({ data: { user: currentUser, session: { user: currentUser } }, error: null });
+        return Promise.resolve({ data: { user: currentUser, session: { user: currentUser, access_token: "mock-access-token" } }, error: null });
       },
       signInWithPassword: function (creds) {
-        currentUser = { id: "mock-" + Date.now(), email: creds.email };
+        currentUser = { id: newId(), email: creds && creds.email };
         notifyAuth("SIGNED_IN");
-        return Promise.resolve({ data: { user: currentUser, session: { user: currentUser } }, error: null });
+        return Promise.resolve({ data: { user: currentUser, session: { user: currentUser, access_token: "mock-access-token" } }, error: null });
       },
       signOut: function () {
         currentUser = null;
@@ -126,9 +204,21 @@ window.supabase = (function () {
         return Promise.resolve({ error: null });
       },
       getUser: function () { return Promise.resolve({ data: { user: currentUser }, error: null }); },
-      getSession: function () { return Promise.resolve({ data: { session: currentUser ? { user: currentUser } : null }, error: null }); },
+      getSession: function () {
+        return Promise.resolve({
+          data: { session: currentUser ? { user: currentUser, access_token: "mock-access-token" } : null },
+          error: null,
+        });
+      },
       onAuthStateChange: function (cb) {
         authListeners.push(cb);
+        // Real supabase-js fires the callback once immediately with the
+        // current session when you subscribe -- matching that here means an
+        // app that renders based on this callback alone (without also
+        // calling getSession()) still sees the mock as signed in right away.
+        setTimeout(function () {
+          cb(currentUser ? "INITIAL_SESSION" : "SIGNED_OUT", currentUser ? { user: currentUser } : null);
+        }, 0);
         return { data: { subscription: { unsubscribe: function () {} } } };
       },
     },
