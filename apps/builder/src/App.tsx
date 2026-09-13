@@ -19,6 +19,8 @@ import { deployApp, type DeployResult } from "./lib/deployClient";
 import { consumeGithubOAuthResult } from "./lib/githubOAuth";
 import { clearIntakeDraft } from "./lib/intakeDraft";
 import { resolveAppName, slugifyRepoName } from "./lib/naming";
+import { filesToRecord, filesFromRecord } from "./lib/fileStorage";
+import { fetchRepoFiles } from "./lib/githubFetch";
 import type { BuildConfig, GeneratedFile, IntakeAnswers, Stack } from "./lib/types";
 
 type Mode = "intake" | "generating" | "build";
@@ -92,6 +94,7 @@ function BuilderApp() {
   const [deploying, setDeploying] = useState(false);
   const [deployError, setDeployError] = useState<string | null>(null);
   const [deployResult, setDeployResult] = useState<DeployResult | null>(null);
+  const [loadingBuildFiles, setLoadingBuildFiles] = useState(false);
 
   // Pick up the GitHub token embedded in the URL after the OAuth callback
   // redirects back here, and store it once.
@@ -130,7 +133,7 @@ function BuilderApp() {
           : null
       );
 
-      const config: BuildConfig = { answers: newAnswers, stack: detectedStack, files: generatedFiles };
+      const config: BuildConfig = { answers: newAnswers, stack: detectedStack, files: filesToRecord(generatedFiles) };
       const created = await createBuild(name, detectedStack, config);
       setActiveBuildId(created?.id ?? null);
       setMode("build");
@@ -148,7 +151,7 @@ function BuilderApp() {
       const updatedFiles = await requestChange(apiKey!, stack, files, request, setChangeProgress);
       setFiles(updatedFiles);
       if (activeBuildId && answers) {
-        const config: BuildConfig = { answers, stack, files: updatedFiles };
+        const config: BuildConfig = { answers, stack, files: filesToRecord(updatedFiles) };
         await updateBuild(activeBuildId, { config });
       }
     } catch (err) {
@@ -160,6 +163,10 @@ function BuilderApp() {
 
   async function handleDeploy() {
     if (!github.value || !vercel.value) return;
+    // Captured before the call resolves and setDeployResult below replaces
+    // it -- this specific click's intent (create vs. update the repo)
+    // shouldn't change based on its own result.
+    const isRedeploy = Boolean(deployResult?.repoFullName);
     setDeploying(true);
     setDeployError(null);
     try {
@@ -167,12 +174,13 @@ function BuilderApp() {
         githubToken: github.value,
         vercelToken: vercel.value,
         repoName: slugifyRepoName(buildName),
+        existingRepoFullName: deployResult?.repoFullName,
         files,
       });
       setDeployResult(result);
       if (activeBuildId && answers) {
-        const config: BuildConfig = { answers, stack, files, ...result };
-        await updateBuild(activeBuildId, { status: "published", config });
+        const config: BuildConfig = { answers, stack, files: filesToRecord(files), ...result };
+        await updateBuild(activeBuildId, { status: isRedeploy ? "updated" : "published", config });
       }
     } catch (err) {
       setDeployError(err instanceof Error ? err.message : "Deployment failed.");
@@ -181,14 +189,13 @@ function BuilderApp() {
     }
   }
 
-  function handleSelectBuild(id: string) {
+  async function handleSelectBuild(id: string) {
     const build = builds.find((b: AppBuild) => b.id === id);
     if (!build) return;
     const config = build.config as unknown as BuildConfig;
     setActiveBuildId(id);
     setBuildName(build.name);
     setStack(config.stack);
-    setFiles(config.files);
     setAnswers(config.answers);
     setDeployResult(
       config.deploymentUrl && config.repoUrl && config.repoFullName
@@ -205,6 +212,23 @@ function BuilderApp() {
     setIncompleteWarning(null);
     setMode("build");
     setSidebarOpen(false);
+
+    let loadedFiles = filesFromRecord(config.files);
+    // Every generation and change request stores files in config (see
+    // filesToRecord above), so this should be rare -- a defensive fallback
+    // for an older build saved before that, or any record that somehow
+    // ended up without them, as long as it was at least deployed once.
+    if (loadedFiles.length === 0 && config.repoFullName && github.value) {
+      setFiles([]);
+      setLoadingBuildFiles(true);
+      try {
+        loadedFiles = await fetchRepoFiles(github.value, config.repoFullName, config.stack);
+      } catch {
+        loadedFiles = [];
+      }
+      setLoadingBuildFiles(false);
+    }
+    setFiles(loadedFiles);
   }
 
   function handleNewBuild() {
@@ -219,6 +243,7 @@ function BuilderApp() {
     setDeployError(null);
     setChangeError(null);
     setIncompleteWarning(null);
+    setLoadingBuildFiles(false);
     setMode("intake");
     setSidebarOpen(false);
   }
@@ -308,11 +333,17 @@ function BuilderApp() {
                 <p className="rounded-lg bg-yellow-50 px-4 py-2 text-sm text-yellow-700">{incompleteWarning}</p>
               )}
 
-              <div className="h-[420px] sm:h-[520px]">
-                <LivePreview files={files} stack={stack} />
-              </div>
+              {loadingBuildFiles ? (
+                <div className="flex h-[420px] items-center justify-center rounded-xl border border-taupe/40 bg-white text-sm text-espresso/60 sm:h-[520px]">
+                  Loading your app's files from GitHub...
+                </div>
+              ) : (
+                <div className="h-[420px] sm:h-[520px]">
+                  <LivePreview files={files} stack={stack} />
+                </div>
+              )}
 
-              <ChangeRequestBar onSubmit={handleChangeRequest} disabled={changeRequesting} />
+              <ChangeRequestBar onSubmit={handleChangeRequest} disabled={changeRequesting || loadingBuildFiles} />
               {changeRequesting && (
                 <p className="text-xs text-espresso/40">
                   {changeProgress.currentFile
@@ -341,6 +372,7 @@ function BuilderApp() {
                 deploying={deploying}
                 deployError={deployError}
                 result={deployResult}
+                isRedeploy={Boolean(deployResult?.repoFullName)}
               />
             </div>
           )}

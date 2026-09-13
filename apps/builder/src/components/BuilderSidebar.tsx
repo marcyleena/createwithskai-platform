@@ -16,12 +16,35 @@ interface BuilderSidebarProps {
   onLoadMore?: () => void;
 }
 
+// "published" (deployed once) and "updated" (deployed, then redeployed after
+// further changes) are both real, distinct statuses in the DB -- see
+// AppBuild in packages/types and app_builds_status_check in
+// supabase/schema.sql -- but read as "Deployed" / "Updated" here rather than
+// their raw storage values.
+const STATUS_LABELS: Record<string, string> = {
+  draft: "Draft",
+  in_progress: "In progress",
+  published: "Deployed",
+  updated: "Updated",
+  archived: "Archived",
+};
+
 const STATUS_STYLES: Record<string, string> = {
   draft: "bg-taupe/20 text-espresso/70",
   in_progress: "bg-accent-pink/15 text-accent-pink",
   published: "bg-green-100 text-green-700",
+  updated: "bg-accent-pink/15 text-accent-pink",
   archived: "bg-taupe/10 text-espresso/40",
 };
+
+function formatTimestamp(iso: string): string {
+  return new Date(iso).toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
 
 export function BuilderSidebar({
   builds,
@@ -70,18 +93,43 @@ export function BuilderSidebar({
                         STATUS_STYLES[build.status] ?? STATUS_STYLES.draft
                       }`}
                     >
-                      {build.status.replace("_", " ")}
+                      {STATUS_LABELS[build.status] ?? build.status.replace("_", " ")}
                     </span>
                     <span className="text-[11px] text-espresso/50">
                       {STACK_LABELS[build.platform as Stack] ?? build.platform}
                     </span>
                   </span>
-                  {config?.deploymentUrl && (
-                    <span className="mt-1 block truncate text-[11px] text-accent-pink">
-                      {config.deploymentUrl}
+                  {build.status === "updated" && (
+                    <span className="mt-0.5 block text-[10px] text-espresso/40">
+                      Updated {formatTimestamp(build.updated_at)}
                     </span>
                   )}
                 </button>
+
+                {config?.deploymentUrl && (
+                  <div className="mt-1.5 flex items-center justify-between gap-2">
+                    <a
+                      href={config.deploymentUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="truncate text-[11px] text-accent-pink underline underline-offset-2 hover:text-accent-pink/80"
+                    >
+                      {config.deploymentUrl}
+                    </a>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSelect(build.id);
+                      }}
+                      className="flex-none rounded-full border border-accent-pink/40 px-2 py-0.5 text-[10px] font-semibold text-accent-pink hover:bg-accent-pink/10"
+                    >
+                      Continue editing
+                    </button>
+                  </div>
+                )}
+
                 <button
                   type="button"
                   onClick={() => onDelete(build.id)}

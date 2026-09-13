@@ -16,6 +16,14 @@ interface DeployParams {
   vercelToken: string;
   repoName: string;
   files: GeneratedFile[];
+  /**
+   * "owner/repo" of an already-deployed build's repository. When present,
+   * api/deploy.js updates that repo (and redeploys the matching Vercel
+   * project) instead of creating a new one -- `repoName` is still sent but
+   * ignored server-side in that case, since it's freshly re-slugified (with
+   * a random suffix) on every call and wouldn't match the original anyway.
+   */
+  existingRepoFullName?: string;
 }
 
 // Slightly longer than api/deploy.js's own maxDuration (60s, see vercel.json)
@@ -27,13 +35,19 @@ const CLIENT_TIMEOUT_MS = 70000;
 // creation + commit and the Vercel deployment server-side (avoids relying on
 // browser CORS support for the Vercel API, and keeps both API calls in one
 // place instead of duplicating fetch logic client-side).
-export async function deployApp({ githubToken, vercelToken, repoName, files }: DeployParams): Promise<DeployResult> {
+export async function deployApp({
+  githubToken,
+  vercelToken,
+  repoName,
+  files,
+  existingRepoFullName,
+}: DeployParams): Promise<DeployResult> {
   let response: Response;
   try {
     response = await fetch("/api/deploy", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ githubToken, vercelToken, repoName, files }),
+      body: JSON.stringify({ githubToken, vercelToken, repoName, files, existingRepoFullName }),
       signal: AbortSignal.timeout(CLIENT_TIMEOUT_MS),
     });
   } catch (err) {

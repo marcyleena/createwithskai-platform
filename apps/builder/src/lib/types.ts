@@ -49,7 +49,12 @@ export const EMPTY_ANSWERS: IntakeAnswers = {
 export interface BuildConfig {
   answers: IntakeAnswers;
   stack: Stack;
-  files: GeneratedFile[];
+  // A plain object keyed by file path, not GeneratedFile[] -- see
+  // lib/fileStorage.ts for the conversion to/from the array shape used
+  // everywhere else in the app (previewBuilder, anthropic.ts, deployClient).
+  // filesFromRecord() there also still accepts the array shape, for builds
+  // saved before this format existed.
+  files: Record<string, string>;
   repoUrl?: string;
   repoFullName?: string;
   deploymentUrl?: string;

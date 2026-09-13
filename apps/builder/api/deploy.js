@@ -93,7 +93,7 @@ export default async function handler(req, res) {
 
   res.setHeader("Access-Control-Allow-Origin", "*");
 
-  const { githubToken, vercelToken, repoName, files } = req.body || {};
+  const { githubToken, vercelToken, repoName, files, existingRepoFullName } = req.body || {};
   if (!githubToken || !vercelToken || !repoName || !Array.isArray(files) || files.length === 0) {
     res.status(400).json({ error: "Missing required fields" });
     return;
@@ -111,23 +111,51 @@ export default async function handler(req, res) {
     }
     const githubUser = await userRes.json();
 
-    // 2. Create the repository.
-    stage = "creating the GitHub repository";
-    const createRepoRes = await fetchWithTimeout("https://api.github.com/user/repos", {
-      method: "POST",
-      headers: { ...GITHUB_HEADERS(githubToken), "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: repoName,
-        private: false,
-        auto_init: false,
-        description: "Generated with AI Business Launchpad App Builder",
-      }),
-    });
-    if (!createRepoRes.ok) {
-      const errBody = await createRepoRes.json().catch(() => ({}));
-      throw new Error(errBody.message || `Could not create the GitHub repository (${createRepoRes.status}).`);
+    // 2. Get the repository to commit to -- either the one this build was
+    // already deployed to (redeploying), or a brand new one.
+    let owner = githubUser.login;
+    let repo;
+    let repoUrl;
+    let repoFullName;
+
+    if (existingRepoFullName) {
+      // The client's `repoName` is a freshly re-slugified value with a
+      // random suffix (see slugifyRepoName in src/lib/naming.ts) -- it's
+      // different on every call and would never match the repo actually
+      // created before, so the authoritative name comes from
+      // existingRepoFullName instead.
+      stage = "looking up the existing GitHub repository";
+      [owner, repo] = existingRepoFullName.split("/");
+      const repoRes = await fetchWithTimeout(`https://api.github.com/repos/${owner}/${repo}`, {
+        headers: GITHUB_HEADERS(githubToken),
+      });
+      if (!repoRes.ok) {
+        throw new Error(`Could not find the existing repository ${existingRepoFullName} (${repoRes.status}).`);
+      }
+      const existingRepo = await repoRes.json();
+      repoUrl = existingRepo.html_url;
+      repoFullName = existingRepo.full_name;
+    } else {
+      stage = "creating the GitHub repository";
+      const createRepoRes = await fetchWithTimeout("https://api.github.com/user/repos", {
+        method: "POST",
+        headers: { ...GITHUB_HEADERS(githubToken), "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: repoName,
+          private: false,
+          auto_init: false,
+          description: "Generated with AI Business Launchpad App Builder",
+        }),
+      });
+      if (!createRepoRes.ok) {
+        const errBody = await createRepoRes.json().catch(() => ({}));
+        throw new Error(errBody.message || `Could not create the GitHub repository (${createRepoRes.status}).`);
+      }
+      const createdRepo = await createRepoRes.json();
+      repo = createdRepo.name;
+      repoUrl = createdRepo.html_url;
+      repoFullName = createdRepo.full_name;
     }
-    const repo = await createRepoRes.json();
 
     // 3. Commit each file. Sequential on purpose: each PUT to the Contents
     // API creates a new commit on top of the branch's current HEAD, so
@@ -136,29 +164,47 @@ export default async function handler(req, res) {
     stage = "committing files to the repository";
     for (const file of files) {
       const encodedPath = file.path.split("/").map(encodeURIComponent).join("/");
+      const contentsUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${encodedPath}`;
       const contentBase64 = Buffer.from(file.content, "utf-8").toString("base64");
-      const putRes = await fetchWithTimeout(
-        `https://api.github.com/repos/${githubUser.login}/${repoName}/contents/${encodedPath}`,
-        {
-          method: "PUT",
-          headers: { ...GITHUB_HEADERS(githubToken), "Content-Type": "application/json" },
-          body: JSON.stringify({ message: `Add ${file.path}`, content: contentBase64 }),
+
+      // Updating an existing file requires its current blob sha -- the
+      // Contents API rejects a PUT with none. A 404 here just means this
+      // path is new since the last deploy, which is fine without one.
+      let sha;
+      if (existingRepoFullName) {
+        const existingRes = await fetchWithTimeout(contentsUrl, { headers: GITHUB_HEADERS(githubToken) });
+        if (existingRes.ok) {
+          const existing = await existingRes.json();
+          sha = existing.sha;
         }
-      );
+      }
+
+      const putRes = await fetchWithTimeout(contentsUrl, {
+        method: "PUT",
+        headers: { ...GITHUB_HEADERS(githubToken), "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: sha ? `Update ${file.path}` : `Add ${file.path}`,
+          content: contentBase64,
+          ...(sha ? { sha } : {}),
+        }),
+      });
       if (!putRes.ok) {
         const errBody = await putRes.json().catch(() => ({}));
         throw new Error(`Could not commit ${file.path}: ${errBody.message || putRes.status}`);
       }
     }
 
-    // 4. Trigger a Vercel deployment directly from the same files.
+    // 4. Trigger a Vercel deployment directly from the same files. Using
+    // `repo` (not the client's repoName) as the project name means a
+    // redeploy lands on the exact same Vercel project -- and therefore the
+    // same *.vercel.app domain -- as the original deployment.
     stage = "triggering the Vercel deployment";
     const hasPackageJson = files.some((f) => f.path === "package.json");
     const deployRes = await fetchWithTimeout("https://api.vercel.com/v13/deployments", {
       method: "POST",
       headers: { Authorization: `Bearer ${vercelToken}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        name: repoName,
+        name: repo,
         files: files.map((f) => ({ file: f.path, data: f.content })),
         projectSettings: { framework: hasPackageJson ? "vite" : null },
         target: "production",
@@ -182,11 +228,11 @@ export default async function handler(req, res) {
     }
 
     stage = "looking up the production alias";
-    const productionAlias = await getProductionAlias(deployment.id, vercelToken, repoName);
+    const productionAlias = await getProductionAlias(deployment.id, vercelToken, repo);
 
     res.status(200).json({
-      repoUrl: repo.html_url,
-      repoFullName: repo.full_name,
+      repoUrl,
+      repoFullName,
       deploymentUrl: `https://${productionAlias}`,
       previewUrl: `https://${deployment.url}`,
     });

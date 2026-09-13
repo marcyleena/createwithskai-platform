@@ -10,6 +10,8 @@ interface DeploySectionProps {
   deploying: boolean;
   deployError: string | null;
   result: DeployResult | null;
+  /** True once this build has already been deployed before -- swaps the button and success copy to redeploy wording. */
+  isRedeploy: boolean;
 }
 
 export function DeploySection({
@@ -19,10 +21,11 @@ export function DeploySection({
   deploying,
   deployError,
   result,
+  isRedeploy,
 }: DeploySectionProps) {
   return (
     <div className="rounded-xl border border-taupe/40 bg-white p-5">
-      <h3 className="mb-4 text-base font-semibold text-espresso">Deploy</h3>
+      <h3 className="mb-4 text-base font-semibold text-espresso">{isRedeploy ? "Redeploy" : "Deploy"}</h3>
 
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between gap-3 rounded-lg border border-taupe/30 p-3">
@@ -60,13 +63,17 @@ export function DeploySection({
           disabled={!githubToken || !vercelToken || deploying}
           className="!bg-accent-pink justify-center py-3 !text-white hover:!bg-accent-pink/90"
         >
-          {deploying ? "Deploying..." : "Deploy"}
+          {deploying ? (isRedeploy ? "Redeploying..." : "Deploying...") : isRedeploy ? "Redeploy" : "Deploy"}
         </Button>
 
         {deployError && <p className="text-sm text-red-600">{deployError}</p>}
 
         {result && (
           <div className="rounded-lg border border-taupe/30 bg-cream p-3 text-sm">
+            {/* Always "Deployed." rather than switching on isRedeploy -- that
+                flips true the instant this very deploy succeeds (it reflects
+                "does a prior deployment now exist"), which would mislabel a
+                first-ever deploy's own success message as a redeploy. */}
             <p className="font-medium text-espresso">Deployed.</p>
             <p className="mt-1 break-all">
               <a

@@ -155,11 +155,19 @@ create table if not exists public.app_builds (
   user_id uuid not null references public.users (id) on delete cascade,
   name text not null,
   platform text not null,
-  status text not null default 'draft' check (status in ('draft', 'in_progress', 'published', 'archived')),
+  status text not null default 'draft' check (status in ('draft', 'in_progress', 'published', 'updated', 'archived')),
   config jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+-- 'updated' (deployed, then redeployed after further edits) was added after
+-- this table's first release -- `create table if not exists` above is a
+-- no-op against an already-existing table, so widen the constraint
+-- explicitly to keep this file safe to re-run against a live database.
+alter table public.app_builds drop constraint if exists app_builds_status_check;
+alter table public.app_builds add constraint app_builds_status_check
+  check (status in ('draft', 'in_progress', 'published', 'updated', 'archived'));
 
 create index if not exists app_builds_user_id_idx on public.app_builds (user_id);
 
