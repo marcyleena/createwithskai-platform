@@ -7,6 +7,7 @@ const STRIPE_DOCS_LINK = "https://stripe.com/docs/payments/accept-a-payment";
 const GROUP_LABELS: Record<ConfigItem["group"], string> = {
   stripe: "Stripe",
   supabase: "Supabase",
+  posthog: "PostHog",
   other: "Other",
 };
 
@@ -77,7 +78,7 @@ export function ConfigureServicesSection({ items, applyingId, disabled, onApply 
 
   if (items.length === 0) return null;
 
-  const groups = (["stripe", "supabase", "other"] as const)
+  const groups = (["stripe", "supabase", "posthog", "other"] as const)
     .map((group) => ({ group, items: items.filter((item) => item.group === group) }))
     .filter((g) => g.items.length > 0);
 

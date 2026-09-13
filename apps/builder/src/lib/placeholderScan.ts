@@ -2,7 +2,7 @@ import type { GeneratedFile } from "./types";
 
 export interface ConfigItem {
   id: string;
-  group: "stripe" | "supabase" | "other";
+  group: "stripe" | "supabase" | "posthog" | "other";
   label: string;
   explanation: string;
   linkLabel?: string;
@@ -15,6 +15,7 @@ export interface ConfigItem {
 const STRIPE_DASHBOARD_KEYS = "https://dashboard.stripe.com/apikeys";
 const STRIPE_DASHBOARD_PRODUCTS = "https://dashboard.stripe.com/products";
 const SUPABASE_DASHBOARD = "https://supabase.com/dashboard";
+const POSTHOG_DASHBOARD = "https://app.posthog.com";
 
 // Not exhaustive prettification (e.g. "Openai" instead of "OpenAI") -- this
 // only runs for the generic catch-all tokens we don't have hand-written
@@ -140,6 +141,14 @@ const KNOWN_TOKENS: Record<string, KnownTokenDef> = {
       "Find this in your Supabase project under Settings -- API. Use the anon / public key, not the service_role key.",
     linkLabel: "Go to Supabase dashboard",
     linkHref: SUPABASE_DASHBOARD,
+  },
+  POSTHOG_KEY: {
+    group: "posthog",
+    label: "Your PostHog API key",
+    explanation:
+      "PostHog is free for up to 1 million events per month. Get your API key from app.posthog.com -- go to Settings -- Project API key.",
+    linkLabel: "Go to PostHog",
+    linkHref: POSTHOG_DASHBOARD,
   },
 };
 

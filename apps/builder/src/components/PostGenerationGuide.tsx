@@ -57,10 +57,10 @@ const DEFAULT_SUGGESTIONS: FeatureSuggestion[] = [
     title: "Analytics",
     description: "Track how users interact with your app using a tool like Plausible or PostHog",
   },
-  {
-    title: "Custom domain",
-    description: "Point a domain you own to your app for a more professional presence",
-  },
+  // Deliberately no "Custom domain" entry here -- that's a deployment
+  // configuration step (already covered by the "Get a custom domain" card
+  // under "Your next steps" once deployed), not something a change request
+  // can actually add to the app's code.
 ];
 
 // "For now" this is a static list -- the one contextual signal worth acting
