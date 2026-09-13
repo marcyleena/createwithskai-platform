@@ -328,6 +328,7 @@ function BuilderApp() {
                 key={activeBuildId ?? "new"}
                 answers={answers}
                 stack={stack}
+                files={files}
                 deployResult={deployResult}
                 onAddFeature={handleChangeRequest}
                 addingFeature={changeRequesting}

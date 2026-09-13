@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@createwithskai/ui";
 import type { DeployResult } from "../lib/deployClient";
-import type { IntakeAnswers, Stack } from "../lib/types";
+import { scanForConfigItems, buildReplacementRequest, type ConfigItem } from "../lib/placeholderScan";
+import type { GeneratedFile, IntakeAnswers, Stack } from "../lib/types";
+import { ConfigureServicesSection } from "./ConfigureServicesSection";
 
 function ChecklistIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
@@ -74,6 +76,7 @@ const COACH_URL = "https://coach.createwithskai.cloud";
 interface PostGenerationGuideProps {
   answers: IntakeAnswers | null;
   stack: Stack;
+  files: GeneratedFile[];
   deployResult: DeployResult | null;
   onAddFeature: (description: string) => void;
   addingFeature: boolean;
@@ -82,6 +85,7 @@ interface PostGenerationGuideProps {
 export function PostGenerationGuide({
   answers,
   stack,
+  files,
   deployResult,
   onAddFeature,
   addingFeature,
@@ -90,9 +94,29 @@ export function PostGenerationGuide({
   const [suggestionsExpanded, setSuggestionsExpanded] = useState(true);
   const [checked, setChecked] = useState<boolean[]>(() => CHECKLIST_ITEMS.map(() => false));
   const [supabaseChecked, setSupabaseChecked] = useState(false);
+  const [applyingConfigId, setApplyingConfigId] = useState<string | null>(null);
 
   function toggleChecked(index: number) {
     setChecked((prev) => prev.map((v, i) => (i === index ? !v : v)));
+  }
+
+  // Re-scans whenever the generated files change, including after a change
+  // request -- a newly added feature (e.g. "add Stripe payments") can
+  // introduce new placeholders just as easily as the initial generation can.
+  const configItems = useMemo(() => scanForConfigItems(files), [files]);
+
+  // addingFeature covers every change request app-wide (this section's own
+  // Apply buttons, "What to add next", and the manual change-request bar),
+  // since only one can run at a time -- once it goes back to false, whatever
+  // was "applying" here must have finished (successfully or not).
+  useEffect(() => {
+    if (!addingFeature) setApplyingConfigId(null);
+  }, [addingFeature]);
+
+  function handleApplyConfig(item: ConfigItem, value: string) {
+    if (!value.trim()) return;
+    setApplyingConfigId(item.id);
+    onAddFeature(buildReplacementRequest(item, value.trim()));
   }
 
   const deployedHost = deployResult ? new URL(deployResult.deploymentUrl).host : null;
@@ -174,6 +198,14 @@ export function PostGenerationGuide({
               )}
             </ul>
           </section>
+
+          {/* Section 1.5 -- placeholder values that need real ones, only rendered when the scan finds something */}
+          <ConfigureServicesSection
+            items={configItems}
+            applyingId={applyingConfigId}
+            disabled={addingFeature}
+            onApply={handleApplyConfig}
+          />
 
           {/* Section 2 -- suggested next features */}
           <section className="rounded-lg border border-taupe/30">
