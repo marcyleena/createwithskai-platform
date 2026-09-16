@@ -176,6 +176,7 @@ function BuilderApp() {
         repoName: slugifyRepoName(buildName),
         existingRepoFullName: deployResult?.repoFullName,
         files,
+        stack,
       });
       setDeployResult(result);
       if (activeBuildId && answers) {

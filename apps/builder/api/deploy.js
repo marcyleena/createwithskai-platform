@@ -34,6 +34,166 @@ const GITHUB_HEADERS = (githubToken) => ({
   "X-GitHub-Api-Version": "2022-11-28",
 });
 
+const REQUIRED_REACT_FILES = ["src/App.jsx", "src/main.jsx", "package.json", "index.html", "vite.config.js"];
+
+const DEFAULT_APP_JSX = `function App() {
+  return (
+    <div style={{ fontFamily: "sans-serif", padding: "2rem", textAlign: "center" }}>
+      <h1>App failed to generate</h1>
+      <p>Something went wrong producing this app's main component. Go back to the Builder and try regenerating.</p>
+    </div>
+  );
+}
+export default App;
+`;
+
+const DEFAULT_MAIN_JSX = `import { StrictMode } from "react";
+import { createRoot } from "react-dom/client";
+import App from "./App.jsx";
+import "./index.css";
+
+createRoot(document.getElementById("root")).render(
+  <StrictMode>
+    <App />
+  </StrictMode>
+);
+`;
+
+const DEFAULT_INDEX_HTML = `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>App</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
+`;
+
+const DEFAULT_VITE_CONFIG = `import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+
+export default defineConfig({
+  plugins: [react()],
+});
+`;
+
+const DEFAULT_INDEX_CSS = `:root {
+  color-scheme: light;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, sans-serif;
+}
+`;
+
+function buildDefaultPackageJson(stack) {
+  const dependencies = { react: "^18.3.1", "react-dom": "^18.3.1" };
+  if (stack === "react-supabase") dependencies["@supabase/supabase-js"] = "^2.45.4";
+  return JSON.stringify(
+    {
+      name: "app",
+      private: true,
+      version: "0.0.1",
+      type: "module",
+      scripts: { dev: "vite", build: "vite build", preview: "vite preview" },
+      dependencies,
+      devDependencies: { "@vitejs/plugin-react": "^4.3.1", vite: "^5.4.2" },
+    },
+    null,
+    2
+  );
+}
+
+function looksLikeValidPackageJson(content) {
+  try {
+    const pkg = JSON.parse(content);
+    const deps = { ...pkg.dependencies, ...pkg.devDependencies };
+    return Boolean(deps.vite && deps.react && deps["react-dom"] && pkg.scripts && pkg.scripts.build);
+  } catch {
+    return false;
+  }
+}
+
+function looksLikeValidViteConfig(content) {
+  return /defineConfig/.test(content) && /@vitejs\/plugin-react/.test(content);
+}
+
+function isCssPath(path) {
+  return path.toLowerCase().endsWith(".css");
+}
+
+// Generated output occasionally omits a required file, puts one at an
+// unexpected path, or produces a malformed package.json/vite.config.js --
+// deploying that guarantees a Vercel build failure days after the fact
+// instead of surfacing the problem now. This repairs what it safely can
+// right before the files are committed, and logs every repair so it's
+// visible in the function's logs.
+//
+// The specific bug this was written for: src/main.jsx always imports
+// "./index.css", which resolves to exactly src/index.css -- if the CSS file
+// Claude generated ended up at a different path (e.g. a bare "index.css" at
+// the repo root), the live preview still renders fine (previewBuilder.ts
+// matches any *.css file regardless of path), but Vercel's build fails with
+// "Could not resolve './index.css' from 'src/main.jsx'".
+function validateAndRepairFiles(files, stack) {
+  if (stack === "static-html") return files; // single self-contained index.html, nothing to validate
+
+  const byPath = new Map(files.map((f) => [f.path, f]));
+  const warnings = [];
+
+  if (!byPath.has("src/index.css")) {
+    const anyCss = files.find((f) => isCssPath(f.path));
+    if (anyCss) {
+      warnings.push(`src/index.css missing -- using the styles found at "${anyCss.path}" instead.`);
+      byPath.set("src/index.css", { path: "src/index.css", content: anyCss.content });
+    } else {
+      warnings.push("No CSS file found anywhere in the generated output -- adding an empty src/index.css.");
+      byPath.set("src/index.css", { path: "src/index.css", content: DEFAULT_INDEX_CSS });
+    }
+  }
+
+  for (const path of REQUIRED_REACT_FILES) {
+    if (byPath.has(path)) continue;
+    warnings.push(`${path} missing from the generated output -- generating a default.`);
+    const content =
+      path === "src/App.jsx"
+        ? DEFAULT_APP_JSX
+        : path === "src/main.jsx"
+          ? DEFAULT_MAIN_JSX
+          : path === "index.html"
+            ? DEFAULT_INDEX_HTML
+            : path === "vite.config.js"
+              ? DEFAULT_VITE_CONFIG
+              : buildDefaultPackageJson(stack);
+    byPath.set(path, { path, content });
+  }
+
+  const pkg = byPath.get("package.json");
+  if (pkg && !looksLikeValidPackageJson(pkg.content)) {
+    warnings.push("package.json is missing required Vite/React dependencies or a build script -- replacing it with a default.");
+    byPath.set("package.json", { path: "package.json", content: buildDefaultPackageJson(stack) });
+  }
+
+  const viteConfig = byPath.get("vite.config.js");
+  if (viteConfig && !looksLikeValidViteConfig(viteConfig.content)) {
+    warnings.push("vite.config.js doesn't look like a valid Vite + React config -- replacing it with a default.");
+    byPath.set("vite.config.js", { path: "vite.config.js", content: DEFAULT_VITE_CONFIG });
+  }
+
+  if (warnings.length > 0) {
+    console.warn(
+      `[api/deploy] repaired the generated file set before committing:\n${warnings.map((w) => `- ${w}`).join("\n")}`
+    );
+  }
+
+  return Array.from(byPath.values());
+}
+
 // Polls the deployment until Vercel finishes building it (or errors/cancels),
 // or until budgetMs runs out -- whichever comes first. The production alias
 // isn't reliably assigned until the deployment reaches a terminal state, but
@@ -93,11 +253,13 @@ export default async function handler(req, res) {
 
   res.setHeader("Access-Control-Allow-Origin", "*");
 
-  const { githubToken, vercelToken, repoName, files, existingRepoFullName } = req.body || {};
-  if (!githubToken || !vercelToken || !repoName || !Array.isArray(files) || files.length === 0) {
+  const { githubToken, vercelToken, repoName, files: rawFiles, existingRepoFullName, stack } = req.body || {};
+  if (!githubToken || !vercelToken || !repoName || !Array.isArray(rawFiles) || rawFiles.length === 0) {
     res.status(400).json({ error: "Missing required fields" });
     return;
   }
+
+  const files = validateAndRepairFiles(rawFiles, stack);
 
   const startedAt = Date.now();
   let stage = "verifying your GitHub account";
@@ -157,11 +319,19 @@ export default async function handler(req, res) {
       repoFullName = createdRepo.full_name;
     }
 
-    // 3. Commit each file. Sequential on purpose: each PUT to the Contents
-    // API creates a new commit on top of the branch's current HEAD, so
-    // firing these in parallel risks two commits racing for the same parent
-    // and one landing with a 409 conflict.
+    // 3. Commit each file -- every entry in `files` (post-repair above),
+    // component files, config files, and stylesheets alike; nothing here
+    // filters by extension or path. Logged explicitly so a missing file in
+    // the deployed repo can be traced back to what was actually sent,
+    // rather than assumed to be this loop dropping something silently.
+    // Sequential on purpose: each PUT to the Contents API creates a new
+    // commit on top of the branch's current HEAD, so firing these in
+    // parallel risks two commits racing for the same parent and one landing
+    // with a 409 conflict.
     stage = "committing files to the repository";
+    console.log(
+      `[api/deploy] committing ${files.length} file(s): ${files.map((f) => f.path).join(", ")}`
+    );
     for (const file of files) {
       const encodedPath = file.path.split("/").map(encodeURIComponent).join("/");
       const contentsUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${encodedPath}`;

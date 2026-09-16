@@ -1,4 +1,4 @@
-import type { GeneratedFile } from "./types";
+import type { GeneratedFile, Stack } from "./types";
 
 export interface DeployResult {
   repoUrl: string;
@@ -16,6 +16,8 @@ interface DeployParams {
   vercelToken: string;
   repoName: string;
   files: GeneratedFile[];
+  /** Lets api/deploy.js validate/repair the file set with the right rules for the stack -- e.g. a static-html build has no package.json to check. */
+  stack: Stack;
   /**
    * "owner/repo" of an already-deployed build's repository. When present,
    * api/deploy.js updates that repo (and redeploys the matching Vercel
@@ -40,6 +42,7 @@ export async function deployApp({
   vercelToken,
   repoName,
   files,
+  stack,
   existingRepoFullName,
 }: DeployParams): Promise<DeployResult> {
   let response: Response;
@@ -47,7 +50,7 @@ export async function deployApp({
     response = await fetch("/api/deploy", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ githubToken, vercelToken, repoName, files, existingRepoFullName }),
+      body: JSON.stringify({ githubToken, vercelToken, repoName, files, stack, existingRepoFullName }),
       signal: AbortSignal.timeout(CLIENT_TIMEOUT_MS),
     });
   } catch (err) {
