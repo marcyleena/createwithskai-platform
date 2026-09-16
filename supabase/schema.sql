@@ -155,19 +155,23 @@ create table if not exists public.app_builds (
   user_id uuid not null references public.users (id) on delete cascade,
   name text not null,
   platform text not null,
-  status text not null default 'draft' check (status in ('draft', 'in_progress', 'published', 'updated', 'archived')),
+  status text not null default 'draft' check (status in ('draft', 'deployed', 'updated')),
   config jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
--- 'updated' (deployed, then redeployed after further edits) was added after
--- this table's first release -- `create table if not exists` above is a
--- no-op against an already-existing table, so widen the constraint
--- explicitly to keep this file safe to re-run against a live database.
+-- This constraint previously allowed a different set here
+-- ('draft', 'in_progress', 'published', 'updated', 'archived') than what was
+-- actually live -- the app's own code was writing 'published' for a first
+-- deploy, which the real constraint rejected outright (app_builds_status_check
+-- violation). Corrected to match the confirmed-live set exactly; `create
+-- table if not exists` above is a no-op against an already-existing table,
+-- so the constraint still needs to be widened/corrected explicitly to keep
+-- this file safe to re-run.
 alter table public.app_builds drop constraint if exists app_builds_status_check;
 alter table public.app_builds add constraint app_builds_status_check
-  check (status in ('draft', 'in_progress', 'published', 'updated', 'archived'));
+  check (status in ('draft', 'deployed', 'updated'));
 
 create index if not exists app_builds_user_id_idx on public.app_builds (user_id);
 

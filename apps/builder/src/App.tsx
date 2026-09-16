@@ -182,7 +182,7 @@ function BuilderApp() {
       if (activeBuildId && answers) {
         const config: BuildConfig = { answers, stack, files: filesToRecord(files), ...result };
         const { build: updated, error: saveError } = await updateBuild(activeBuildId, {
-          status: isRedeploy ? "updated" : "published",
+          status: isRedeploy ? "updated" : "deployed",
           config,
         });
         // Confirms the Supabase write actually landed. If it comes back

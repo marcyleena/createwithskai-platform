@@ -59,11 +59,12 @@ export interface AppBuild {
   user_id: string;
   name: string;
   platform: string;
-  // "updated" -- deployed at least once, then redeployed after further
-  // changes -- is distinct from "published" (deployed exactly once so far)
-  // so the Builder's sidebar can tell a fresh deployment from one with edits
-  // pushed after it, per app_builds_status_check in supabase/schema.sql.
-  status: "draft" | "in_progress" | "published" | "updated" | "archived";
+  // Exactly these three -- confirmed against the live database's
+  // app_builds_status_check constraint (supabase/schema.sql). "updated"
+  // (deployed, then redeployed after further changes) is distinct from
+  // "deployed" (deployed exactly once so far) so the Builder's sidebar can
+  // tell a fresh deployment from one with edits pushed after it.
+  status: "draft" | "deployed" | "updated";
   config: Record<string, unknown>;
   created_at: string;
   updated_at: string;

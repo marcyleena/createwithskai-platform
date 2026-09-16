@@ -16,25 +16,21 @@ interface BuilderSidebarProps {
   onLoadMore?: () => void;
 }
 
-// "published" (deployed once) and "updated" (deployed, then redeployed after
+// "deployed" (deployed once) and "updated" (deployed, then redeployed after
 // further changes) are both real, distinct statuses in the DB -- see
 // AppBuild in packages/types and app_builds_status_check in
 // supabase/schema.sql -- but read as "Deployed" / "Updated" here rather than
 // their raw storage values.
 const STATUS_LABELS: Record<string, string> = {
   draft: "Draft",
-  in_progress: "In progress",
-  published: "Deployed",
+  deployed: "Deployed",
   updated: "Updated",
-  archived: "Archived",
 };
 
 const STATUS_STYLES: Record<string, string> = {
   draft: "bg-taupe/20 text-espresso/70",
-  in_progress: "bg-accent-pink/15 text-accent-pink",
-  published: "bg-green-100 text-green-700",
+  deployed: "bg-green-100 text-green-700",
   updated: "bg-accent-pink/15 text-accent-pink",
-  archived: "bg-taupe/10 text-espresso/40",
 };
 
 function formatTimestamp(iso: string): string {
@@ -82,7 +78,7 @@ export function BuilderSidebar({
             // status is a single reliable field, where the config-derived
             // check silently hid this button entirely if a deploy's Supabase
             // write ever failed partway (see updateBuild in useBuilds.ts).
-            const isDeployed = build.status === "published" || build.status === "updated";
+            const isDeployed = build.status === "deployed" || build.status === "updated";
             return (
               <div
                 key={build.id}
