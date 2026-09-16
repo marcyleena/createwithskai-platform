@@ -64,7 +64,10 @@ export function useBuilds(userId: string | undefined) {
         .insert({ user_id: userId, name, platform, status: "draft", config })
         .select()
         .single();
-      if (error || !data) return null;
+      if (error || !data) {
+        console.error("[useBuilds] createBuild failed:", error);
+        return null;
+      }
       const created = data as AppBuild;
       setBuilds((prev) => [created, ...prev]);
       return created;
@@ -74,8 +77,19 @@ export function useBuilds(userId: string | undefined) {
 
   const updateBuild = useCallback(
     async (id: string, patch: { status?: AppBuild["status"]; name?: string; config?: BuildConfig }) => {
-      const { data } = await supabase.from("app_builds").update(patch).eq("id", id).select().single();
-      if (!data) return null;
+      // Previously ignored `error` entirely -- a failed update (e.g. the DB's
+      // status check constraint rejecting a value, an RLS mismatch, a
+      // network blip) silently returned null with no indication anything
+      // went wrong, and the local `builds` array kept whatever it had
+      // before. Since BuilderSidebar and handleSelectBuild both read from
+      // that array, a deploy whose Supabase write failed this way looked
+      // like it succeeded (deployApp itself did) but reverted to
+      // pre-deployment state the moment you navigated away and back.
+      const { data, error } = await supabase.from("app_builds").update(patch).eq("id", id).select().single();
+      if (error || !data) {
+        console.error(`[useBuilds] updateBuild failed for build ${id}:`, error);
+        return null;
+      }
       const updated = data as AppBuild;
       setBuilds((prev) =>
         prev.some((b) => b.id === id)

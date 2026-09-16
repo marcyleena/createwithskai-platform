@@ -78,6 +78,11 @@ export function BuilderSidebar({
           )}
           {builds.map((build) => {
             const config = build.config as unknown as BuildConfig | undefined;
+            // Driven by the status column, not config?.deploymentUrl alone --
+            // status is a single reliable field, where the config-derived
+            // check silently hid this button entirely if a deploy's Supabase
+            // write ever failed partway (see updateBuild in useBuilds.ts).
+            const isDeployed = build.status === "published" || build.status === "updated";
             return (
               <div
                 key={build.id}
@@ -106,17 +111,21 @@ export function BuilderSidebar({
                   )}
                 </button>
 
-                {config?.deploymentUrl && (
+                {isDeployed && (
                   <div className="mt-1.5 flex items-center justify-between gap-2">
-                    <a
-                      href={config.deploymentUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      onClick={(e) => e.stopPropagation()}
-                      className="truncate text-[11px] text-accent-pink underline underline-offset-2 hover:text-accent-pink/80"
-                    >
-                      {config.deploymentUrl}
-                    </a>
+                    {config?.deploymentUrl ? (
+                      <a
+                        href={config.deploymentUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="truncate text-[11px] text-accent-pink underline underline-offset-2 hover:text-accent-pink/80"
+                      >
+                        {config.deploymentUrl}
+                      </a>
+                    ) : (
+                      <span className="truncate text-[11px] text-espresso/40">Deployment link unavailable</span>
+                    )}
                     <button
                       type="button"
                       onClick={(e) => {

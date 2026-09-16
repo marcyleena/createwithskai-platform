@@ -181,7 +181,20 @@ function BuilderApp() {
       setDeployResult(result);
       if (activeBuildId && answers) {
         const config: BuildConfig = { answers, stack, files: filesToRecord(files), ...result };
-        await updateBuild(activeBuildId, { status: isRedeploy ? "updated" : "published", config });
+        const updated = await updateBuild(activeBuildId, {
+          status: isRedeploy ? "updated" : "published",
+          config,
+        });
+        // Confirms the Supabase write actually landed. If it comes back
+        // null, updateBuild has already logged why (useBuilds.ts) -- the
+        // deployment itself (GitHub + Vercel) still succeeded, so that's
+        // surfaced here rather than treated as a failed deploy.
+        console.log("[handleDeploy] app_builds record after deployment:", updated);
+        if (!updated) {
+          setDeployError(
+            "Your app deployed, but saving its status failed -- it may show as not deployed if you navigate away. Try deploying again."
+          );
+        }
       }
     } catch (err) {
       setDeployError(err instanceof Error ? err.message : "Deployment failed.");
