@@ -76,7 +76,10 @@ export function useBuilds(userId: string | undefined) {
   );
 
   const updateBuild = useCallback(
-    async (id: string, patch: { status?: AppBuild["status"]; name?: string; config?: BuildConfig }) => {
+    async (
+      id: string,
+      patch: { status?: AppBuild["status"]; name?: string; config?: BuildConfig }
+    ): Promise<{ build: AppBuild | null; error: string | null }> => {
       // Previously ignored `error` entirely -- a failed update (e.g. the DB's
       // status check constraint rejecting a value, an RLS mismatch, a
       // network blip) silently returned null with no indication anything
@@ -85,10 +88,12 @@ export function useBuilds(userId: string | undefined) {
       // that array, a deploy whose Supabase write failed this way looked
       // like it succeeded (deployApp itself did) but reverted to
       // pre-deployment state the moment you navigated away and back.
+      // Returning the error message (not just logging it) lets callers like
+      // App.tsx's handleDeploy show the real reason in the UI, not a guess.
       const { data, error } = await supabase.from("app_builds").update(patch).eq("id", id).select().single();
       if (error || !data) {
         console.error(`[useBuilds] updateBuild failed for build ${id}:`, error);
-        return null;
+        return { build: null, error: error?.message ?? "Unknown error saving to Supabase." };
       }
       const updated = data as AppBuild;
       setBuilds((prev) =>
@@ -96,7 +101,7 @@ export function useBuilds(userId: string | undefined) {
           ? prev.map((b) => (b.id === id ? updated : b)).sort(byRecency)
           : [updated, ...prev].sort(byRecency)
       );
-      return updated;
+      return { build: updated, error: null };
     },
     []
   );
