@@ -2,6 +2,7 @@ import type { ConsiderationAnswer, IntakeAnswers, Stack } from "./types";
 import { findStyleTile } from "./styleTiles";
 import { resolveAppName } from "./naming";
 import { findFixedQuestion, NOT_SURE_VALUE } from "./considerations";
+import { buildAssetsPromptBlock } from "./assets";
 
 // Files are transported as plain delimited text, not JSON. Real source code
 // is full of quotes, backslashes, and template literals that are easy for a
@@ -214,7 +215,7 @@ Needs to save data between sessions: ${answers.needsPersistence ? "Yes" : "No"}
 Uses AI: ${answers.usesAI ? "Yes" : "No"}
 ${aiFeatureText(answers)}
 ${answers.specialRequirements.trim() ? `Special requirements: ${answers.specialRequirements.trim()}` : ""}
-
+${answers.assets.length > 0 ? `\n${buildAssetsPromptBlock(answers.assets)}\n` : ""}
 ${stackInstructions(stack)}`;
 }
 

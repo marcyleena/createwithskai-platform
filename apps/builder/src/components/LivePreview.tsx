@@ -1,20 +1,22 @@
 import { useEffect, useState } from "react";
 import { buildPreviewDocument } from "../lib/previewBuilder";
+import type { UploadedAsset } from "../lib/assets";
 import type { GeneratedFile, Stack } from "../lib/types";
 
 interface LivePreviewProps {
   files: GeneratedFile[];
   stack: Stack;
+  assets?: UploadedAsset[];
 }
 
-export function LivePreview({ files, stack }: LivePreviewProps) {
+export function LivePreview({ files, stack, assets = [] }: LivePreviewProps) {
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    const doc = buildPreviewDocument(files, stack);
+    const doc = buildPreviewDocument(files, stack, assets);
     const blob = new Blob([doc], { type: "text/html" });
     setBlobUrl(URL.createObjectURL(blob));
-  }, [files, stack]);
+  }, [files, stack, assets]);
 
   // Runs right before the next blobUrl is set (or on unmount), by which
   // point the iframe has already re-rendered with the new URL -- so the old

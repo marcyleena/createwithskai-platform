@@ -6,16 +6,18 @@ import { loadIntakeDraft, saveIntakeDraft, clearIntakeDraft } from "../lib/intak
 import { buildIntakeSummaryText } from "../lib/considerations";
 import { generateConsiderationQuestions } from "../lib/anthropic";
 import { EMPTY_ANSWERS, type ConsiderationAnswer, type IntakeAnswers, type StyleTileId } from "../lib/types";
+import type { AssetLabelValue, UploadedAsset } from "../lib/assets";
 import { ConsiderationsChecklist } from "./ConsiderationsChecklist";
+import { AssetUploader } from "./AssetUploader";
 
 interface IntakeWizardProps {
   apiKey: string;
   onComplete: (answers: IntakeAnswers) => void;
 }
 
-type Step = "appName" | "description" | "audience" | "style" | "colors" | "features" | "ai" | "summary";
+type Step = "appName" | "description" | "audience" | "style" | "colors" | "features" | "ai" | "assets" | "summary";
 
-type Section = "basics" | "style" | "colors" | "features" | "ai";
+type Section = "basics" | "style" | "colors" | "features" | "ai" | "assets";
 
 interface BasicsField {
   key: "appName" | "description" | "audience";
@@ -327,7 +329,7 @@ export function IntakeWizard({ apiKey, onComplete }: IntakeWizardProps) {
         onSave={
           editingSection
             ? goToSummary
-            : () => afterStepAdvance(answers.usesAI ? "ai" : "summary")
+            : () => afterStepAdvance(answers.usesAI ? "ai" : "assets")
         }
         saveLabel={editingSection ? "Save" : "Continue"}
       >
@@ -359,7 +361,11 @@ export function IntakeWizard({ apiKey, onComplete }: IntakeWizardProps) {
   // ---- Step 5: AI + special requirements ----
   function renderAIStep() {
     return (
-      <StepShell title="A bit more about the AI feature" onSave={goToSummary} saveLabel={editingSection ? "Save" : "Continue"}>
+      <StepShell
+        title="A bit more about the AI feature"
+        onSave={editingSection ? goToSummary : () => afterStepAdvance("assets")}
+        saveLabel={editingSection ? "Save" : "Continue"}
+      >
         <Field label="What should the AI do in your app?">
           <textarea
             value={answers.aiDescription}
@@ -372,6 +378,35 @@ export function IntakeWizard({ apiKey, onComplete }: IntakeWizardProps) {
         <Field label="Anything else we should know?" note="Optional">
           <TextInput value={answers.specialRequirements} onChange={(v) => patch({ specialRequirements: v })} />
         </Field>
+      </StepShell>
+    );
+  }
+
+  // ---- Step 6: assets (optional, always the last step before summary) ----
+  function handleAddAsset(asset: UploadedAsset) {
+    patch({ assets: [...answers.assets, asset] });
+  }
+
+  function handleRemoveAsset(asset: UploadedAsset) {
+    patch({ assets: answers.assets.filter((a) => a.id !== asset.id) });
+  }
+
+  function handleAssetLabelChange(id: string, label: AssetLabelValue) {
+    patch({ assets: answers.assets.map((a) => (a.id === id ? { ...a, label } : a)) });
+  }
+
+  function renderAssetsStep() {
+    return (
+      <StepShell title="Add your assets" onSave={goToSummary} saveLabel={editingSection ? "Save" : "Continue"}>
+        <p className="-mt-2 text-sm text-espresso/60">
+          Upload any images you want to include in your app. These will be available throughout the build.
+        </p>
+        <AssetUploader
+          assets={answers.assets}
+          onAdd={handleAddAsset}
+          onRemove={handleRemoveAsset}
+          onLabelChange={handleAssetLabelChange}
+        />
       </StepShell>
     );
   }
@@ -422,6 +457,23 @@ export function IntakeWizard({ apiKey, onComplete }: IntakeWizardProps) {
           </SummarySection>
         )}
 
+        {answers.assets.length > 0 && (
+          <SummarySection title="Assets" onEdit={() => setEditingSection("assets")}>
+            <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
+              {answers.assets.map((asset) => (
+                <div key={asset.id} className="flex flex-col items-center gap-1">
+                  <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-md border border-taupe/30 bg-cream">
+                    <img src={asset.dataUrl} alt={asset.filename} className="max-h-full max-w-full object-contain" />
+                  </div>
+                  <span className="w-full truncate text-center text-[10px] text-espresso/60" title={asset.filename}>
+                    {asset.filename}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </SummarySection>
+        )}
+
         <ConsiderationsChecklist
           considerations={answers.considerations}
           onAnswer={handleConsiderationAnswer}
@@ -449,12 +501,14 @@ export function IntakeWizard({ apiKey, onComplete }: IntakeWizardProps) {
   if (editingSection === "colors") return renderColorsStep();
   if (editingSection === "features") return renderFeaturesStep();
   if (editingSection === "ai") return renderAIStep();
+  if (editingSection === "assets") return renderAssetsStep();
 
   if (step === "appName" || step === "description" || step === "audience") return renderBasicsStep();
   if (step === "style") return renderStyleStep();
   if (step === "colors") return renderColorsStep();
   if (step === "features") return renderFeaturesStep();
   if (step === "ai") return renderAIStep();
+  if (step === "assets") return renderAssetsStep();
   return renderSummary();
 }
 

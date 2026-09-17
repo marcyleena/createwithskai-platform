@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { Button } from "@createwithskai/ui";
 import type { DeployResult } from "../lib/deployClient";
 import { scanForConfigItems, buildReplacementRequest, type ConfigItem } from "../lib/placeholderScan";
+import type { AssetLabelValue, UploadedAsset } from "../lib/assets";
 import type { GeneratedFile, IntakeAnswers, Stack } from "../lib/types";
+import { AppAssetsSection } from "./AppAssetsSection";
 import { ConfigureServicesSection } from "./ConfigureServicesSection";
 
 function ChecklistIcon(props: React.SVGProps<SVGSVGElement>) {
@@ -80,6 +82,10 @@ interface PostGenerationGuideProps {
   deployResult: DeployResult | null;
   onAddFeature: (description: string) => void;
   addingFeature: boolean;
+  assets: UploadedAsset[];
+  onAddAsset: (asset: UploadedAsset) => void;
+  onRemoveAsset: (asset: UploadedAsset) => void;
+  onAssetLabelChange: (id: string, label: AssetLabelValue) => void;
 }
 
 export function PostGenerationGuide({
@@ -89,6 +95,10 @@ export function PostGenerationGuide({
   deployResult,
   onAddFeature,
   addingFeature,
+  assets,
+  onAddAsset,
+  onRemoveAsset,
+  onAssetLabelChange,
 }: PostGenerationGuideProps) {
   const [expanded, setExpanded] = useState(true);
   const [suggestionsExpanded, setSuggestionsExpanded] = useState(true);
@@ -205,6 +215,15 @@ export function PostGenerationGuide({
             applyingId={applyingConfigId}
             disabled={addingFeature}
             onApply={handleApplyConfig}
+          />
+
+          {/* Section 1.75 -- upload/manage app assets, after the service configuration cards */}
+          <AppAssetsSection
+            assets={assets}
+            onAdd={onAddAsset}
+            onRemove={onRemoveAsset}
+            onLabelChange={onAssetLabelChange}
+            disabled={addingFeature}
           />
 
           {/* Section 2 -- suggested next features */}

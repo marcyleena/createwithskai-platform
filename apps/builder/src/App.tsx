@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth, RequireAuth } from "@createwithskai/auth";
 import { getHubOrigin } from "@createwithskai/api";
 import { Button, Card, BackToHubLink } from "@createwithskai/ui";
@@ -20,7 +20,8 @@ import { consumeGithubOAuthResult } from "./lib/githubOAuth";
 import { clearIntakeDraft } from "./lib/intakeDraft";
 import { resolveAppName, slugifyRepoName } from "./lib/naming";
 import { filesToRecord, filesFromRecord } from "./lib/fileStorage";
-import { fetchRepoFiles } from "./lib/githubFetch";
+import { fetchRepoFiles, fetchPublicAssets } from "./lib/githubFetch";
+import { buildAssetChangeRequest, buildAssetRemovalRequest, type AssetLabelValue, type UploadedAsset } from "./lib/assets";
 import type { BuildConfig, GeneratedFile, IntakeAnswers, Stack } from "./lib/types";
 
 type Mode = "intake" | "generating" | "build";
@@ -88,6 +89,32 @@ function BuilderApp() {
   const [stack, setStack] = useState<Stack>("static-html");
   const [files, setFiles] = useState<GeneratedFile[]>([]);
   const [answers, setAnswers] = useState<IntakeAnswers | null>(null);
+  const [assets, setAssets] = useState<UploadedAsset[]>([]);
+
+  // Synchronous mirrors of `files`/`assets` state -- handleChangeRequest and
+  // the asset add/remove handlers below need the CURRENT array the instant
+  // they run, not whatever value was closed over when the function was
+  // defined at the last render. React batches/delays state updates, so a
+  // change request queued right after setAssets/setFiles (or two queued back
+  // to back) would otherwise read a stale array. Refs updated in the same
+  // tick as the state setter sidestep that.
+  const filesRef = useRef<GeneratedFile[]>(files);
+  const assetsRef = useRef<UploadedAsset[]>(assets);
+  useEffect(() => {
+    filesRef.current = files;
+  }, [files]);
+  useEffect(() => {
+    assetsRef.current = assets;
+  }, [assets]);
+
+  // Serializes the change requests that asset uploads/removals trigger so a
+  // drag-drop batch of several images doesn't fire overlapping generation
+  // calls against the same base file set -- each waits for the previous one
+  // to finish (success or failure) before starting.
+  const assetChangeQueueRef = useRef<Promise<void>>(Promise.resolve());
+  function queueAssetChange(task: () => Promise<void>) {
+    assetChangeQueueRef.current = assetChangeQueueRef.current.then(task, task);
+  }
 
   const [generateError, setGenerateError] = useState<string | null>(null);
   const [incompleteWarning, setIncompleteWarning] = useState<string | null>(null);
@@ -130,6 +157,7 @@ function BuilderApp() {
       const name = resolveAppName(newAnswers);
       setBuildName(name);
       setFiles(generatedFiles);
+      setAssets(newAnswers.assets);
       setDeployResult(null);
       setIncompleteWarning(
         isComplexApp(newAnswers) && isLikelySparseGeneration(generatedFiles, detectedStack)
@@ -137,7 +165,12 @@ function BuilderApp() {
           : null
       );
 
-      const config: BuildConfig = { answers: newAnswers, stack: detectedStack, files: filesToRecord(generatedFiles) };
+      const config: BuildConfig = {
+        answers: newAnswers,
+        stack: detectedStack,
+        files: filesToRecord(generatedFiles),
+        assets: newAnswers.assets,
+      };
       const created = await createBuild(name, detectedStack, config);
       setActiveBuildId(created?.id ?? null);
       setMode("build");
@@ -147,21 +180,58 @@ function BuilderApp() {
     }
   }
 
-  async function handleChangeRequest(request: string) {
+  // `assetsOverride` lets the asset add/remove handlers below pass the array
+  // they just computed instead of relying on `assets` state, which may not
+  // have re-rendered yet (see the refs comment above) -- omitted, it falls
+  // back to the current state via assetsRef. Existing callers (the change
+  // request bar, "what to add next") don't pass it and are unaffected.
+  async function handleChangeRequest(request: string, assetsOverride?: UploadedAsset[]) {
     setChangeRequesting(true);
     setChangeError(null);
     setChangeProgress({ charsSoFar: 0, currentFile: null });
     try {
-      const updatedFiles = await requestChange(apiKey!, stack, files, request, setChangeProgress);
+      const updatedFiles = await requestChange(apiKey!, stack, filesRef.current, request, setChangeProgress);
       setFiles(updatedFiles);
       if (activeBuildId && answers) {
-        const config: BuildConfig = { answers, stack, files: filesToRecord(updatedFiles) };
+        const currentAssets = assetsOverride ?? assetsRef.current;
+        const config: BuildConfig = { answers, stack, files: filesToRecord(updatedFiles), assets: currentAssets };
         await updateBuild(activeBuildId, { config });
       }
     } catch (err) {
       setChangeError(friendlyErrorMessage(err));
     } finally {
       setChangeRequesting(false);
+    }
+  }
+
+  // Uploading an asset makes it available to reference (committed to
+  // public/<filename> on the next deploy, see handleDeploy) and immediately
+  // asks the model to wire it into the app -- e.g. a logo into the header.
+  // Removing one asks the model to undo that. Both go through the same
+  // serialized queue so a multi-file drag-drop doesn't race.
+  function handleAddAsset(asset: UploadedAsset) {
+    const nextAssets = [...assetsRef.current, asset];
+    assetsRef.current = nextAssets;
+    setAssets(nextAssets);
+    queueAssetChange(() => handleChangeRequest(buildAssetChangeRequest(asset), nextAssets));
+  }
+
+  function handleRemoveAsset(asset: UploadedAsset) {
+    const nextAssets = assetsRef.current.filter((a) => a.id !== asset.id);
+    assetsRef.current = nextAssets;
+    setAssets(nextAssets);
+    queueAssetChange(() => handleChangeRequest(buildAssetRemovalRequest(asset), nextAssets));
+  }
+
+  // Relabeling doesn't change what's in the app, just which category the
+  // asset is filed under -- no change request needed, just persist it.
+  function handleAssetLabelChange(id: string, label: AssetLabelValue) {
+    const nextAssets = assetsRef.current.map((a) => (a.id === id ? { ...a, label } : a));
+    assetsRef.current = nextAssets;
+    setAssets(nextAssets);
+    if (activeBuildId && answers) {
+      const config: BuildConfig = { answers, stack, files: filesToRecord(filesRef.current), assets: nextAssets };
+      void updateBuild(activeBuildId, { config });
     }
   }
 
@@ -183,10 +253,11 @@ function BuilderApp() {
         stack,
         supabaseUrl: supabaseProjectUrl.value ?? undefined,
         supabaseAnonKey: supabaseAnonKey.value ?? undefined,
+        assets,
       });
       setDeployResult(result);
       if (activeBuildId && answers) {
-        const config: BuildConfig = { answers, stack, files: filesToRecord(files), ...result };
+        const config: BuildConfig = { answers, stack, files: filesToRecord(files), assets, ...result };
         const { build: updated, error: saveError } = await updateBuild(activeBuildId, {
           status: isRedeploy ? "updated" : "deployed",
           config,
@@ -235,10 +306,15 @@ function BuilderApp() {
     setSidebarOpen(false);
 
     let loadedFiles = filesFromRecord(config.files);
-    // Every generation and change request stores files in config (see
-    // filesToRecord above), so this should be rare -- a defensive fallback
-    // for an older build saved before that, or any record that somehow
-    // ended up without them, as long as it was at least deployed once.
+    let loadedAssets = config.assets ?? [];
+    // Every generation and change request stores files (and, from here on,
+    // assets) in config, so this should be rare -- a defensive fallback for
+    // an older build saved before that, or any record that somehow ended up
+    // without them, as long as it was at least deployed once. Assets can't
+    // be recovered this way for files (public/ has no non-image code to
+    // restore from), but they can for assets (public/ IS where they live),
+    // so the two fallbacks are independent -- a build might be missing one
+    // but not the other.
     if (loadedFiles.length === 0 && config.repoFullName && github.value) {
       setFiles([]);
       setLoadingBuildFiles(true);
@@ -249,7 +325,17 @@ function BuilderApp() {
       }
       setLoadingBuildFiles(false);
     }
+    if (loadedAssets.length === 0 && config.repoFullName && github.value) {
+      try {
+        loadedAssets = await fetchPublicAssets(github.value, config.repoFullName);
+      } catch {
+        loadedAssets = [];
+      }
+    }
     setFiles(loadedFiles);
+    filesRef.current = loadedFiles;
+    setAssets(loadedAssets);
+    assetsRef.current = loadedAssets;
   }
 
   function handleNewBuild() {
@@ -258,7 +344,10 @@ function BuilderApp() {
     setActiveBuildId(null);
     setBuildName("");
     setFiles([]);
+    filesRef.current = [];
     setAnswers(null);
+    setAssets([]);
+    assetsRef.current = [];
     setDeployResult(null);
     setGenerateError(null);
     setDeployError(null);
@@ -360,7 +449,7 @@ function BuilderApp() {
                 </div>
               ) : (
                 <div className="h-[420px] sm:h-[520px]">
-                  <LivePreview files={files} stack={stack} />
+                  <LivePreview files={files} stack={stack} assets={assets} />
                 </div>
               )}
 
@@ -384,6 +473,10 @@ function BuilderApp() {
                 deployResult={deployResult}
                 onAddFeature={handleChangeRequest}
                 addingFeature={changeRequesting}
+                assets={assets}
+                onAddAsset={handleAddAsset}
+                onRemoveAsset={handleRemoveAsset}
+                onAssetLabelChange={handleAssetLabelChange}
               />
 
               <DeploySection

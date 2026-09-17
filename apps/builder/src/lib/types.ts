@@ -1,3 +1,5 @@
+import type { UploadedAsset } from "./assets";
+
 export type Stack = "static-html" | "react-localstorage" | "react-supabase";
 
 export interface GeneratedFile {
@@ -27,6 +29,8 @@ export interface IntakeAnswers {
   specialRequirements: string;
   /** Keyed by the exact question text (dynamic or fixed). */
   considerations: Record<string, ConsiderationAnswer>;
+  /** Uploaded during intake -- see components/IntakeWizard.tsx's assets step. */
+  assets: UploadedAsset[];
 }
 
 export const EMPTY_ANSWERS: IntakeAnswers = {
@@ -43,6 +47,7 @@ export const EMPTY_ANSWERS: IntakeAnswers = {
   aiDescription: "",
   specialRequirements: "",
   considerations: {},
+  assets: [],
 };
 
 // Shape stored in app_builds.config (jsonb) -- see supabase/schema.sql.
@@ -55,6 +60,12 @@ export interface BuildConfig {
   // filesFromRecord() there also still accepts the array shape, for builds
   // saved before this format existed.
   files: Record<string, string>;
+  // The build's current/live asset set -- starts as a copy of
+  // answers.assets at generation time, then diverges as assets are added or
+  // removed post-generation (answers.assets stays a historical record of
+  // what was uploaded during intake). Restored on "Continue editing" the
+  // same way files is.
+  assets?: UploadedAsset[];
   repoUrl?: string;
   repoFullName?: string;
   deploymentUrl?: string;

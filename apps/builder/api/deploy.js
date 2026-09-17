@@ -34,6 +34,48 @@ const GITHUB_HEADERS = (githubToken) => ({
   "X-GitHub-Api-Version": "2022-11-28",
 });
 
+// Uploaded assets carry their content as a "data:<mime>;base64,<...>" string
+// (see lib/assets.ts) -- already base64, unlike source files which need
+// encoding from their raw text content.
+function dataUrlToBase64(dataUrl) {
+  const commaIndex = dataUrl.indexOf(",");
+  return commaIndex === -1 ? dataUrl : dataUrl.slice(commaIndex + 1);
+}
+
+// Shared by both the source-file commit loop and the asset commit loop
+// below -- same create-or-update-by-sha logic either way, just a different
+// source for the base64 content.
+async function commitFileToGithub(owner, repo, path, contentBase64, githubToken, checkExisting) {
+  const encodedPath = path.split("/").map(encodeURIComponent).join("/");
+  const contentsUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${encodedPath}`;
+
+  // Updating an existing file requires its current blob sha -- the Contents
+  // API rejects a PUT with none. A 404 here just means this path is new
+  // since the last deploy, which is fine without one.
+  let sha;
+  if (checkExisting) {
+    const existingRes = await fetchWithTimeout(contentsUrl, { headers: GITHUB_HEADERS(githubToken) });
+    if (existingRes.ok) {
+      const existing = await existingRes.json();
+      sha = existing.sha;
+    }
+  }
+
+  const putRes = await fetchWithTimeout(contentsUrl, {
+    method: "PUT",
+    headers: { ...GITHUB_HEADERS(githubToken), "Content-Type": "application/json" },
+    body: JSON.stringify({
+      message: sha ? `Update ${path}` : `Add ${path}`,
+      content: contentBase64,
+      ...(sha ? { sha } : {}),
+    }),
+  });
+  if (!putRes.ok) {
+    const errBody = await putRes.json().catch(() => ({}));
+    throw new Error(`Could not commit ${path}: ${errBody.message || putRes.status}`);
+  }
+}
+
 const REQUIRED_REACT_FILES = ["src/App.jsx", "src/main.jsx", "package.json", "index.html", "vite.config.js"];
 
 const DEFAULT_APP_JSX = `function App() {
@@ -330,6 +372,7 @@ export default async function handler(req, res) {
     stack,
     supabaseUrl,
     supabaseAnonKey,
+    assets: rawAssets,
   } = req.body || {};
   if (!githubToken || !vercelToken || !repoName || !Array.isArray(rawFiles) || rawFiles.length === 0) {
     res.status(400).json({ error: "Missing required fields" });
@@ -337,6 +380,7 @@ export default async function handler(req, res) {
   }
 
   const files = validateAndRepairFiles(rawFiles, stack);
+  const assets = Array.isArray(rawAssets) ? rawAssets : [];
 
   const startedAt = Date.now();
   let stage = "verifying your GitHub account";
@@ -406,38 +450,31 @@ export default async function handler(req, res) {
     // parallel risks two commits racing for the same parent and one landing
     // with a 409 conflict.
     stage = "committing files to the repository";
-    console.log(
-      `[api/deploy] committing ${files.length} file(s): ${files.map((f) => f.path).join(", ")}`
-    );
+    console.log(`[api/deploy] committing ${files.length} file(s): ${files.map((f) => f.path).join(", ")}`);
     for (const file of files) {
-      const encodedPath = file.path.split("/").map(encodeURIComponent).join("/");
-      const contentsUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${encodedPath}`;
       const contentBase64 = Buffer.from(file.content, "utf-8").toString("base64");
+      await commitFileToGithub(owner, repo, file.path, contentBase64, githubToken, Boolean(existingRepoFullName));
+    }
 
-      // Updating an existing file requires its current blob sha -- the
-      // Contents API rejects a PUT with none. A 404 here just means this
-      // path is new since the last deploy, which is fine without one.
-      let sha;
-      if (existingRepoFullName) {
-        const existingRes = await fetchWithTimeout(contentsUrl, { headers: GITHUB_HEADERS(githubToken) });
-        if (existingRes.ok) {
-          const existing = await existingRes.json();
-          sha = existing.sha;
-        }
-      }
-
-      const putRes = await fetchWithTimeout(contentsUrl, {
-        method: "PUT",
-        headers: { ...GITHUB_HEADERS(githubToken), "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: sha ? `Update ${file.path}` : `Add ${file.path}`,
-          content: contentBase64,
-          ...(sha ? { sha } : {}),
-        }),
-      });
-      if (!putRes.ok) {
-        const errBody = await putRes.json().catch(() => ({}));
-        throw new Error(`Could not commit ${file.path}: ${errBody.message || putRes.status}`);
+    // 3.1. Commit uploaded assets to public/ -- same commit mechanism, just
+    // base64 content that's already base64 (a data URL) rather than raw
+    // text needing encoding, and always going to the public/ directory
+    // regardless of whatever path the asset's own filename implies.
+    if (assets.length > 0) {
+      stage = "committing assets to the repository";
+      console.log(
+        `[api/deploy] committing ${assets.length} asset(s): ${assets.map((a) => `public/${a.filename}`).join(", ")}`
+      );
+      for (const asset of assets) {
+        const contentBase64 = dataUrlToBase64(asset.dataUrl);
+        await commitFileToGithub(
+          owner,
+          repo,
+          `public/${asset.filename}`,
+          contentBase64,
+          githubToken,
+          Boolean(existingRepoFullName)
+        );
       }
     }
 
@@ -468,7 +505,10 @@ export default async function handler(req, res) {
       headers: { Authorization: `Bearer ${vercelToken}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         name: repo,
-        files: files.map((f) => ({ file: f.path, data: f.content })),
+        files: [
+          ...files.map((f) => ({ file: f.path, data: f.content })),
+          ...assets.map((a) => ({ file: `public/${a.filename}`, data: dataUrlToBase64(a.dataUrl), encoding: "base64" })),
+        ],
         projectSettings: { framework: hasPackageJson ? "vite" : null },
         target: "production",
       }),

@@ -1,3 +1,4 @@
+import type { UploadedAsset } from "./assets";
 import type { GeneratedFile, Stack } from "./types";
 
 export interface DeployResult {
@@ -37,6 +38,8 @@ interface DeployParams {
    */
   supabaseUrl?: string;
   supabaseAnonKey?: string;
+  /** Committed to public/<filename> in the same repo, alongside the source files. */
+  assets?: UploadedAsset[];
 }
 
 // Slightly longer than api/deploy.js's own maxDuration (60s, see vercel.json)
@@ -57,6 +60,7 @@ export async function deployApp({
   existingRepoFullName,
   supabaseUrl,
   supabaseAnonKey,
+  assets,
 }: DeployParams): Promise<DeployResult> {
   let response: Response;
   try {
@@ -72,6 +76,7 @@ export async function deployApp({
         existingRepoFullName,
         supabaseUrl,
         supabaseAnonKey,
+        assets,
       }),
       signal: AbortSignal.timeout(CLIENT_TIMEOUT_MS),
     });

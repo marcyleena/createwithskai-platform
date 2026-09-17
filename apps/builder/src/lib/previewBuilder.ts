@@ -5,6 +5,7 @@ import reactSource from "../../../../node_modules/react/umd/react.development.js
 import reactDomSource from "../../../../node_modules/react-dom/umd/react-dom.development.js?raw";
 import babelSource from "@babel/standalone/babel.min.js?raw";
 import type { GeneratedFile, Stack } from "./types";
+import type { UploadedAsset } from "./assets";
 import { findFile, findEntryFile } from "./fileLookup";
 
 // Libraries are bundled from node_modules and inlined directly into the
@@ -236,17 +237,38 @@ function reactPreviewHead(css: string, stack: Stack): string {
 ${stack === "react-supabase" ? `<script>${MOCK_SUPABASE_CLIENT_SOURCE}</script>` : ""}`;
 }
 
+function escapeRegExpLiteral(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// Uploaded assets are committed to public/<filename> at deploy time and
+// referenced by generated code as "/<filename>" (e.g. src="/logo.png") --
+// paths that don't resolve to anything inside the blob: URL the preview
+// iframe loads from. Rewriting each literal occurrence to the asset's own
+// data URL is what actually makes an uploaded image show up in the preview,
+// in both JSX attribute values and CSS url(...) references.
+function inlineAssetReferences(source: string, assets: UploadedAsset[]): string {
+  let result = source;
+  for (const asset of assets) {
+    const escapedPath = escapeRegExpLiteral(`/${asset.filename}`);
+    result = result
+      .replace(new RegExp(`(["'\`])${escapedPath}\\1`, "g"), (_match, quote) => `${quote}${asset.dataUrl}${quote}`)
+      .replace(new RegExp(`url\\((['"]?)${escapedPath}\\1\\)`, "g"), (_match, quote) => `url(${quote}${asset.dataUrl}${quote})`);
+  }
+  return result;
+}
+
 // Builds the document loaded into the preview iframe. Static-html apps are
 // rendered as-is; React apps are stitched into a single Babel-standalone
 // page so hooks and JSX run for real without needing an actual bundler.
-export function buildPreviewDocument(files: GeneratedFile[], stack: Stack): string {
+export function buildPreviewDocument(files: GeneratedFile[], stack: Stack, assets: UploadedAsset[] = []): string {
   const paths = files.map((f) => f.path);
   console.log("[previewBuilder] parsed files from generation output:", paths);
 
   if (stack === "static-html") {
     const html = findFile(files, "index.html");
     if (!html) console.warn("[previewBuilder] no index.html found among parsed files:", paths);
-    return html?.content ?? "<p>No index.html was generated.</p>";
+    return inlineAssetReferences(html?.content ?? "<p>No index.html was generated.</p>", assets);
   }
 
   const appFile = findEntryFile(files);
@@ -262,17 +284,20 @@ export function buildPreviewDocument(files: GeneratedFile[], stack: Stack): stri
   // only a raw HTML file -- render it directly instead of feeding HTML
   // through the JSX/Babel pipeline.
   if (appFile.path.toLowerCase().endsWith(".html")) {
-    return appFile.content;
+    return inlineAssetReferences(appFile.content, assets);
   }
 
   // Normally just src/index.css, but concatenating every *.css file covers
   // the (rare) case of Claude adding an extra stylesheet without needing to
   // special-case it.
-  const css = files
-    .filter((f) => f.path.toLowerCase().endsWith(".css"))
-    .map((f) => f.content)
-    .join("\n");
-  const appCode = stripModuleSyntax(appFile.content);
+  const css = inlineAssetReferences(
+    files
+      .filter((f) => f.path.toLowerCase().endsWith(".css"))
+      .map((f) => f.content)
+      .join("\n"),
+    assets
+  );
+  const appCode = inlineAssetReferences(stripModuleSyntax(appFile.content), assets);
 
   return `<!doctype html>
 <html>
