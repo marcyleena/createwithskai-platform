@@ -75,6 +75,10 @@ function BuilderApp() {
   const { builds, createBuild, updateBuild, deleteBuild, hasMore, loadingMore, loadMore } = useBuilds(user?.id);
   const github = useCredential({ provider: "github", credentialType: "oauth_token", valueKey: "access_token" });
   const vercel = useCredential({ provider: "vercel", credentialType: "api_token", valueKey: "token" });
+  // Same (provider, credential_type) rows apps/hub's SupabaseGuideCard saves
+  // -- see apps/hub/src/components/SupabaseGuideCard.tsx.
+  const supabaseProjectUrl = useCredential({ provider: "supabase", credentialType: "project_url", valueKey: "project_url" });
+  const supabaseAnonKey = useCredential({ provider: "supabase", credentialType: "anon_key", valueKey: "anon_key" });
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [mode, setMode] = useState<Mode>("intake");
@@ -177,6 +181,8 @@ function BuilderApp() {
         existingRepoFullName: deployResult?.repoFullName,
         files,
         stack,
+        supabaseUrl: supabaseProjectUrl.value ?? undefined,
+        supabaseAnonKey: supabaseAnonKey.value ?? undefined,
       });
       setDeployResult(result);
       if (activeBuildId && answers) {
@@ -388,6 +394,11 @@ function BuilderApp() {
                 deployError={deployError}
                 result={deployResult}
                 isRedeploy={Boolean(deployResult?.repoFullName)}
+                supabaseWarning={
+                  stack === "react-supabase" && (!supabaseProjectUrl.value || !supabaseAnonKey.value)
+                    ? "This app uses Supabase for its database. Add your Supabase credentials in your hub dashboard before deploying so your app works correctly."
+                    : null
+                }
               />
             </div>
           )}

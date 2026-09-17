@@ -194,6 +194,74 @@ function validateAndRepairFiles(files, stack) {
   return Array.from(byPath.values());
 }
 
+// Vite inlines import.meta.env.VITE_* at BUILD TIME, so these have to exist
+// on the Vercel project *before* the deployment (which triggers the build)
+// runs -- setting them afterward wouldn't help an app already built without
+// them. Only the react-supabase stack's generated code reads these two, so
+// this (and upsertVercelEnvVars below) is only ever called for that stack.
+//
+// The deployment call in step 4 below implicitly creates the Vercel project
+// on a fresh deploy, which is fine when there's nothing else to set up first
+// -- but env vars have to be attached to a project that already exists, so
+// react-supabase apps need it created explicitly, ahead of that call.
+async function ensureVercelProject(repo, vercelToken) {
+  const getRes = await fetchWithTimeout(`https://api.vercel.com/v9/projects/${repo}`, {
+    headers: { Authorization: `Bearer ${vercelToken}` },
+  });
+  if (getRes.ok) return;
+  const createRes = await fetchWithTimeout("https://api.vercel.com/v10/projects", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${vercelToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ name: repo, framework: "vite" }),
+  });
+  if (createRes.ok || createRes.status === 409) return; // 409 -- already exists (e.g. a racing request), fine
+  const errBody = await createRes.json().catch(() => ({}));
+  throw new Error(errBody.error?.message || `Could not create the Vercel project (${createRes.status}).`);
+}
+
+// Creates each env var that doesn't exist yet and updates the value of any
+// that already does (a redeploy, or credentials changed since the last
+// deploy) -- a plain create-only call would 409 on a second deploy once the
+// vars are already there.
+async function upsertVercelEnvVars(repo, vercelToken, vars) {
+  const listRes = await fetchWithTimeout(`https://api.vercel.com/v9/projects/${repo}/env`, {
+    headers: { Authorization: `Bearer ${vercelToken}` },
+  });
+  const existing = listRes.ok ? (await listRes.json()).envs || [] : [];
+
+  for (const { key, value } of vars) {
+    const match = existing.find((e) => e.key === key);
+    if (match) {
+      const patchRes = await fetchWithTimeout(`https://api.vercel.com/v9/projects/${repo}/env/${match.id}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${vercelToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ value }),
+      });
+      if (!patchRes.ok) {
+        const errBody = await patchRes.json().catch(() => ({}));
+        throw new Error(
+          `Could not update Vercel environment variable ${key}: ${errBody.error?.message || patchRes.status}`
+        );
+      }
+    } else {
+      // POST /v10/projects/{idOrName}/env -- see the task this was written
+      // for; `target` covers every deployment type so the var is available
+      // whether this specific deploy landed as production or preview.
+      const createRes = await fetchWithTimeout(`https://api.vercel.com/v10/projects/${repo}/env`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${vercelToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ key, value, type: "encrypted", target: ["production", "preview", "development"] }),
+      });
+      if (!createRes.ok) {
+        const errBody = await createRes.json().catch(() => ({}));
+        throw new Error(
+          `Could not set Vercel environment variable ${key}: ${errBody.error?.message || createRes.status}`
+        );
+      }
+    }
+  }
+}
+
 // Polls the deployment until Vercel finishes building it (or errors/cancels),
 // or until budgetMs runs out -- whichever comes first. The production alias
 // isn't reliably assigned until the deployment reaches a terminal state, but
@@ -253,7 +321,16 @@ export default async function handler(req, res) {
 
   res.setHeader("Access-Control-Allow-Origin", "*");
 
-  const { githubToken, vercelToken, repoName, files: rawFiles, existingRepoFullName, stack } = req.body || {};
+  const {
+    githubToken,
+    vercelToken,
+    repoName,
+    files: rawFiles,
+    existingRepoFullName,
+    stack,
+    supabaseUrl,
+    supabaseAnonKey,
+  } = req.body || {};
   if (!githubToken || !vercelToken || !repoName || !Array.isArray(rawFiles) || rawFiles.length === 0) {
     res.status(400).json({ error: "Missing required fields" });
     return;
@@ -362,6 +439,22 @@ export default async function handler(req, res) {
         const errBody = await putRes.json().catch(() => ({}));
         throw new Error(`Could not commit ${file.path}: ${errBody.message || putRes.status}`);
       }
+    }
+
+    // 3.5. For react-supabase apps, the generated code reads
+    // import.meta.env.VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY at build
+    // time -- without these set on the project before the deployment below
+    // triggers the build, the deployed app throws "supabaseUrl is required"
+    // the moment it loads. Skipped (not blocked) when the user hasn't
+    // connected Supabase credentials yet -- App.tsx warns about this before
+    // the click that gets here.
+    if (stack === "react-supabase" && supabaseUrl && supabaseAnonKey) {
+      stage = "setting up Supabase environment variables on Vercel";
+      await ensureVercelProject(repo, vercelToken);
+      await upsertVercelEnvVars(repo, vercelToken, [
+        { key: "VITE_SUPABASE_URL", value: supabaseUrl },
+        { key: "VITE_SUPABASE_ANON_KEY", value: supabaseAnonKey },
+      ]);
     }
 
     // 4. Trigger a Vercel deployment directly from the same files. Using

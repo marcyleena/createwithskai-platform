@@ -26,6 +26,17 @@ interface DeployParams {
    * a random suffix) on every call and wouldn't match the original anyway.
    */
   existingRepoFullName?: string;
+  /**
+   * The user's own Supabase project URL/anon key (from user_credentials,
+   * provider "supabase"). Only meaningful for the react-supabase stack --
+   * api/deploy.js uses them to set VITE_SUPABASE_URL/VITE_SUPABASE_ANON_KEY
+   * on the Vercel project before the build runs, since Vite inlines
+   * import.meta.env.VITE_* at build time. Omit (or leave unset) if the user
+   * hasn't connected Supabase yet; the deploy still proceeds, just without
+   * those variables set.
+   */
+  supabaseUrl?: string;
+  supabaseAnonKey?: string;
 }
 
 // Slightly longer than api/deploy.js's own maxDuration (60s, see vercel.json)
@@ -44,13 +55,24 @@ export async function deployApp({
   files,
   stack,
   existingRepoFullName,
+  supabaseUrl,
+  supabaseAnonKey,
 }: DeployParams): Promise<DeployResult> {
   let response: Response;
   try {
     response = await fetch("/api/deploy", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ githubToken, vercelToken, repoName, files, stack, existingRepoFullName }),
+      body: JSON.stringify({
+        githubToken,
+        vercelToken,
+        repoName,
+        files,
+        stack,
+        existingRepoFullName,
+        supabaseUrl,
+        supabaseAnonKey,
+      }),
       signal: AbortSignal.timeout(CLIENT_TIMEOUT_MS),
     });
   } catch (err) {

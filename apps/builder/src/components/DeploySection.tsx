@@ -12,6 +12,8 @@ interface DeploySectionProps {
   result: DeployResult | null;
   /** True once this build has already been deployed before -- swaps the button and success copy to redeploy wording. */
   isRedeploy: boolean;
+  /** Set when this is a react-supabase build and the user hasn't connected Supabase credentials in the hub yet -- shown but doesn't block deploying. */
+  supabaseWarning?: string | null;
 }
 
 export function DeploySection({
@@ -22,6 +24,7 @@ export function DeploySection({
   deployError,
   result,
   isRedeploy,
+  supabaseWarning,
 }: DeploySectionProps) {
   return (
     <div className="rounded-xl border border-taupe/40 bg-white p-5">
@@ -52,6 +55,15 @@ export function DeploySection({
           <p className="rounded-lg border border-taupe/30 bg-cream p-3 text-xs text-espresso/70">
             Connect Vercel in your hub dashboard to enable deployment.{" "}
             <a href={getHubOrigin()} className="text-accent-pink underline">
+              createwithskai.cloud
+            </a>
+          </p>
+        )}
+
+        {supabaseWarning && (
+          <p className="rounded-lg bg-yellow-50 px-3 py-2 text-xs text-yellow-700">
+            {supabaseWarning}{" "}
+            <a href={getHubOrigin()} target="_blank" rel="noreferrer" className="underline">
               createwithskai.cloud
             </a>
           </p>
